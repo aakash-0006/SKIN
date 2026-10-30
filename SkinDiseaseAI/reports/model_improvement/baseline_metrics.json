@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "model_name": "Original HAM10000 Baseline (best_model.keras)",
+    "model_path": "models/best_model.keras",
+    "architecture": "EfficientNetB0 (ImageNet weights, GlobalAveragePooling2D, Dropout 0.3, Dense 7 Softmax)",
+    "evaluation_dataset": "HAM10000 Preserved Frozen Test Set",
+    "split_manifest": "outputs/splits.csv",
+    "test_samples_total": 1494,
+    "classes": [
+      "akiec",
+      "bcc",
+      "bkl",
+      "df",
+      "mel",
+      "nv",
+      "vasc"
+    ],
+    "date_evaluated": "2026-10-29",
+    "environment": {
+      "python_version": "3.12.10",
+      "tensorflow_version": "2.21.0",
+      "os": "Windows 11 (64-bit)",
+      "hardware_ram_gb": 24.0,
+      "execution_backend": "CPU (oneDNN / AVX2 multithreaded)"
+    }
+  },
+  "overall_metrics": {
+    "accuracy": 0.6760,
+    "balanced_accuracy": 0.6349,
+    "macro_precision": 0.5120,
+    "macro_recall": 0.6349,
+    "macro_f1": 0.5327,
+    "weighted_f1": 0.7048,
+    "macro_roc_auc_ovr": 0.9255,
+    "macro_pr_auc_ovr": 0.6187
+  },
+  "per_class_metrics": {
+    "akiec": {
+      "support": 63,
+      "precision": 0.6154,
+      "recall_sensitivity": 0.3810,
+      "specificity": 0.9895,
+      "f1_score": 0.4706,
+      "roc_auc_ovr": 0.9320,
+      "pr_auc_ovr": 0.5500,
+      "reliability_status": "Adequate support (>=20)"
+    },
+    "bcc": {
+      "support": 68,
+      "precision": 0.5658,
+      "recall_sensitivity": 0.6324,
+      "specificity": 0.9769,
+      "f1_score": 0.5972,
+      "roc_auc_ovr": 0.9621,
+      "pr_auc_ovr": 0.5767,
+      "reliability_status": "Adequate support (>=20)"
+    },
+    "bkl": {
+      "support": 152,
+      "precision": 0.3849,
+      "recall_sensitivity": 0.7039,
+      "specificity": 0.8726,
+      "f1_score": 0.4977,
+      "roc_auc_ovr": 0.8990,
+      "pr_auc_ovr": 0.5453,
+      "reliability_status": "Adequate support (>=20)"
+    },
+    "df": {
+      "support": 7,
+      "precision": 0.1250,
+      "recall_sensitivity": 0.5714,
+      "specificity": 0.9812,
+      "f1_score": 0.2051,
+      "roc_auc_ovr": 0.9843,
+      "pr_auc_ovr": 0.3480,
+      "reliability_status": "LOW SUPPORT (<20) - High variance; interpret cautiously"
+    },
+    "mel": {
+      "support": 187,
+      "precision": 0.3559,
+      "recall_sensitivity": 0.5348,
+      "specificity": 0.8615,
+      "f1_score": 0.4274,
+      "roc_auc_ovr": 0.8026,
+      "pr_auc_ovr": 0.4952,
+      "reliability_status": "Adequate support (>=20)"
+    },
+    "nv": {
+      "support": 996,
+      "precision": 0.9431,
+      "recall_sensitivity": 0.7159,
+      "specificity": 0.9137,
+      "f1_score": 0.8139,
+      "roc_auc_ovr": 0.9243,
+      "pr_auc_ovr": 0.9587,
+      "reliability_status": "Dominant class (66.7% of test set)"
+    },
+    "vasc": {
+      "support": 21,
+      "precision": 0.5938,
+      "recall_sensitivity": 0.9048,
+      "specificity": 0.9912,
+      "f1_score": 0.7170,
+      "roc_auc_ovr": 0.9743,
+      "pr_auc_ovr": 0.8570,
+      "reliability_status": "Borderline support (>=20)"
+    }
+  },
+  "confusion_matrix": {
+    "rows_ground_truth": [
+      "akiec",
+      "bcc",
+      "bkl",
+      "df",
+      "mel",
+      "nv",
+      "vasc"
+    ],
+    "columns_predicted": [
+      "akiec",
+      "bcc",
+      "bkl",
+      "df",
+      "mel",
+      "nv",
+      "vasc"
+    ],
+    "matrix": [
+      [24, 10, 16, 5, 7, 1, 0],
+      [4, 43, 8, 4, 6, 3, 0],
+      [6, 7, 107, 3, 17, 11, 1],
+      [1, 0, 0, 4, 1, 1, 0],
+      [3, 8, 44, 5, 100, 25, 2],
+      [1, 8, 103, 11, 150, 713, 10],
+      [0, 0, 0, 0, 0, 2, 19]
+    ]
+  }
+}

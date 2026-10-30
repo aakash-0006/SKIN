@@ -1,0 +1,44 @@
+{
+  "meta_only": {
+    "bce": {
+      "roc_auc": 0.9936,
+      "pr_auc": 0.9936,
+      "pos_mean": 0.8446,
+      "neg_mean": 0.1695
+    },
+    "focal_alpha_025": {
+      "roc_auc": 0.5464,
+      "pr_auc": 0.5777,
+      "pos_mean": 0.4409,
+      "neg_mean": 0.4377
+    }
+  },
+  "image_only": {
+    "bce": {
+      "roc_auc": 0.5204,
+      "pr_auc": 0.5385,
+      "pos_mean": 0.5914,
+      "neg_mean": 0.5913
+    },
+    "focal_alpha_025": {
+      "roc_auc": 0.495,
+      "pr_auc": 0.4975,
+      "pos_mean": 0.6755,
+      "neg_mean": 0.6753
+    }
+  },
+  "fusion": {
+    "bce": {
+      "roc_auc": 0.7993,
+      "pr_auc": 0.8107,
+      "pos_mean": 0.5703,
+      "neg_mean": 0.4802
+    },
+    "focal_alpha_025": {
+      "roc_auc": 0.5038,
+      "pr_auc": 0.564,
+      "pos_mean": 0.3944,
+      "neg_mean": 0.3928
+    }
+  }
+}

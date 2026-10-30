@@ -1,0 +1,45 @@
+{
+  "total_eval_images": 96,
+  "total_eval_participants": 4,
+  "eval_scores": {
+    "min": 3.896,
+    "median": 6.249,
+    "p90": 9.137,
+    "max": 11.913
+  },
+  "overall_flagged_rate": 0.125,
+  "by_irregularity_label": {
+    "irregular_0": {
+      "count": 31,
+      "flagged_rate": 0.0645,
+      "mean_score": 5.938
+    },
+    "irregular_1": {
+      "count": 65,
+      "flagged_rate": 0.1538,
+      "mean_score": 6.812
+    }
+  },
+  "by_participant": {
+    "27": {
+      "count": 25,
+      "flagged_rate": 0.0,
+      "mean_score": 5.316
+    },
+    "570": {
+      "count": 21,
+      "flagged_rate": 0.3333,
+      "mean_score": 7.603
+    },
+    "1566": {
+      "count": 25,
+      "flagged_rate": 0.0,
+      "mean_score": 5.918
+    },
+    "1000000": {
+      "count": 25,
+      "flagged_rate": 0.2,
+      "mean_score": 7.454
+    }
+  }
+}

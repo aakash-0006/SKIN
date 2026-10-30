@@ -1,0 +1,62 @@
+{
+  "test_manifest": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\outputs\\splits.csv",
+  "test_images": 1494,
+  "models": {
+    "original": {
+      "path": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\best_model.keras",
+      "accuracy": 0.6760374832663989,
+      "macro_f1": 0.5326959401877663,
+      "weighted_f1": 0.704807861822806,
+      "mel_recall": 0.5347593582887701,
+      "mel_precision": 0.35587188612099646
+    },
+    "isic_finetuned": {
+      "path": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\isic_finetuned.keras",
+      "accuracy": 0.7048192771084337,
+      "macro_f1": 0.5591404264555412,
+      "weighted_f1": 0.7283632873303146,
+      "mel_recall": 0.41711229946524064,
+      "mel_precision": 0.5064935064935064
+    },
+    "isic_augmented_v1": {
+      "path": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\isic_augmented_v1.keras",
+      "accuracy": 0.7228915662650602,
+      "macro_f1": 0.5784862781304986,
+      "weighted_f1": 0.7427722097708701,
+      "mel_recall": 0.37967914438502676,
+      "mel_precision": 0.5634920634920635
+    }
+  },
+  "augmented_vs_original": {
+    "accuracy_delta": 0.04685408299866134,
+    "macro_f1_delta": 0.04579033794273224,
+    "weighted_f1_delta": 0.03796434794806414,
+    "mel_recall_delta": -0.15508021390374332,
+    "mel_precision_delta": 0.20762017737106703,
+    "per_class_f1_delta": {
+      "akiec": -0.005471956224350205,
+      "bcc": 0.04983660130718959,
+      "bkl": -0.02357083294728063,
+      "df": 0.11487179487179489,
+      "mel": 0.026323694055323477,
+      "nv": 0.0494372400901808,
+      "vasc": 0.10910582444626749
+    }
+  },
+  "augmented_vs_isic_finetuned": {
+    "accuracy_delta": 0.01807228915662651,
+    "macro_f1_delta": 0.019345851674957393,
+    "weighted_f1_delta": 0.014408922440555472,
+    "mel_recall_delta": -0.03743315508021389,
+    "mel_precision_delta": 0.05699855699855705,
+    "per_class_f1_delta": {
+      "akiec": 0.028752642706131093,
+      "bcc": 0.008760951188986232,
+      "bkl": 0.0005223723501298627,
+      "df": 0.025882352941176467,
+      "mel": -0.003803884459351814,
+      "nv": 0.01845033970665977,
+      "vasc": 0.05685618729096986
+    }
+  }
+}

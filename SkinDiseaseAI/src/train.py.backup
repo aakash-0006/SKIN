@@ -1,0 +1,224 @@
+"""Fine-tune the saved HAM10000 model with compatible ISIC 2019 data.
+
+Run the inspection stage first: ``python -m src.isic --isic-root <path>``.
+The original model and the original HAM test split are never overwritten.
+"""
+import argparse
+import json
+import random
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.model_selection import GroupShuffleSplit
+from sklearn.utils.class_weight import compute_class_weight
+
+from src.dataset import CLASSES, PROJECT_DIR, load_config, resolve_split_paths
+from src.isic import HAM_TO_IDX, inspect_isic, load_isic_training_frame, _resolve
+from src.preprocessing import make_dataset
+
+
+def _require_split_integrity(df):
+    sets = {name: set(part.lesion_id.astype(str)) for name, part in df.groupby("split")}
+    names = list(sets)
+    for i, left in enumerate(names):
+        for right in names[i + 1:]:
+            overlap = sets[left] & sets[right]
+            if overlap:
+                raise RuntimeError(f"Existing HAM split has {len(overlap)} lesion IDs in both {left} and {right}.")
+    test = df[df.split == "test"]
+    if test.empty:
+        raise RuntimeError("Existing split manifest has no test rows; refusing to create or move test data.")
+
+
+def _isic_train_val(isic, seed, train_share, duplicate_ids):
+    isic = isic[~isic.image.astype(str).isin(duplicate_ids)].copy()
+    if isic.empty:
+        raise RuntimeError("No compatible ISIC images remain after label and duplicate exclusions.")
+    groups = isic.lesion_group.astype(str).values
+    if len(set(groups)) == 1:
+        raise RuntimeError("ISIC data has only one lesion group; cannot make grouped train/validation splits.")
+    splitter = GroupShuffleSplit(n_splits=1, train_size=train_share, random_state=seed)
+    tr, va = next(splitter.split(isic, groups=groups))
+    isic.loc[:, "split"] = ""
+    isic.iloc[tr, isic.columns.get_loc("split")] = "train"
+    isic.iloc[va, isic.columns.get_loc("split")] = "val"
+    return isic
+
+
+def main():
+    cfg = load_config()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--ham-root", "--root", dest="ham_root", default=cfg["dataset_root"])
+    ap.add_argument("--isic-root", default=cfg.get("isic_dataset_root") or None)
+    ap.add_argument("--batch-size", type=int, default=cfg["batch_size"])
+    ap.add_argument("--epochs", type=int, default=cfg.get("finetune_epochs", 10))
+    ap.add_argument("--learning-rate", type=float, default=cfg.get("finetune_lr", 1e-5))
+    ap.add_argument("--finetune-layers", type=int, default=cfg.get("finetune_layers", 40))
+    ap.add_argument("--resume", action="store_true", help="Continue from models/isic_finetuned.keras if it exists")
+    ap.add_argument("--inspection-acknowledged", action="store_true",
+                    help="Confirm that outputs/isic_dataset_report.json was generated and reviewed")
+    args = ap.parse_args()
+    if not args.isic_root:
+        ap.error("Set isic_dataset_root in config.json or provide --isic-root")
+    if args.batch_size < 1 or args.epochs < 1 or args.learning_rate <= 0 or args.finetune_layers < 1:
+        ap.error("batch size, epochs and fine-tuned layers must be positive; learning rate must be greater than zero")
+    report_path = _resolve(cfg.get("inspection_report_path", "outputs/isic_dataset_report.json"))
+    if not report_path.is_file():
+        ap.error(f"Inspection report is missing. Run `python -m src.isic --isic-root {args.isic_root}` first.")
+    if not args.inspection_acknowledged:
+        ap.error("Review the inspection report first, then rerun with --inspection-acknowledged to authorize training.")
+    reviewed_report = json.loads(report_path.read_text(encoding="utf-8"))
+    if not reviewed_report.get("scan_signature"):
+        ap.error("The report is only preliminary or incomplete. Generate a complete report with `python -m src.isic` first.")
+
+    random.seed(cfg["seed"])
+    np.random.seed(cfg["seed"])
+    tf.keras.utils.set_random_seed(cfg["seed"])
+    out = PROJECT_DIR / "outputs"
+    models = PROJECT_DIR / "models"
+    out.mkdir(exist_ok=True)
+    models.mkdir(exist_ok=True)
+
+    splits_path = _resolve(cfg.get("existing_splits_path", "outputs/splits.csv"))
+    baseline = resolve_split_paths(pd.read_csv(splits_path), args.ham_root)
+    _require_split_integrity(baseline)
+    # Inspect each run so stale reports cannot authorize a changed dataset.
+    isic_rows, ham_scan, report = inspect_isic(
+        args.isic_root, args.ham_root, splits_path,
+        report_path,
+        cfg.get("near_duplicate_hamming_threshold", 4),
+    )
+    if report["scan_signature"] != reviewed_report["scan_signature"]:
+        raise RuntimeError("Dataset or split integrity changed since the reviewed report. Review the refreshed report "
+                           "and rerun with --inspection-acknowledged.")
+    if report["invalid_images"] or report["metadata_without_image"]:
+        print("Inspection found corrupt or missing ISIC images; they are excluded from supervised training.")
+
+    # Exclude ISIC participants in any cross-dataset or internal duplicate candidate.
+    duplicate_ids = set()
+    duplicate_ids.update(map(str, report["shared_image_ids_with_ham"]))
+    duplicate_ids.update(str(row["image_id"]) for row in report["duplicate_image_filenames"])
+    for pair in report["exact_duplicate_pairs_with_ham"] + report["near_duplicate_pairs_with_ham"]:
+        duplicate_ids.add(str(pair["isic_image"]))
+    for pair in report["exact_duplicate_pairs_within_isic"] + report["near_duplicate_pairs_within_isic"]:
+        duplicate_ids.update((str(pair["image_a"]), str(pair["image_b"])))
+    bad_ham_test = [p for p in ham_scan if p.get("error") and p.get("split") == "test"]
+    if bad_ham_test:
+        raise RuntimeError(f"The preserved HAM test split has {len(bad_ham_test)} unreadable image(s); repair before training.")
+    # Resolve any discovered HAM cross-split duplicates by excluding only the
+    # non-test copy from this run. The saved test partition is immutable.
+    ham_excluded_ids = {str(p["image_id"]) for p in ham_scan if p.get("error") and p.get("split") != "test"}
+    ham_conflicts = (report["exact_duplicate_pairs_within_ham_across_splits"] +
+                     report["near_duplicate_pairs_within_ham_across_splits"])
+    for pair in ham_conflicts:
+        a, b = pair["image_a"], pair["image_b"]
+        sa, sb = pair["split_a"], pair["split_b"]
+        if sa == "test":
+            ham_excluded_ids.add(b)
+        elif sb == "test":
+            ham_excluded_ids.add(a)
+        elif sa == "train" or sb == "train":
+            ham_excluded_ids.add(a if sa == "train" else b)
+        else:
+            ham_excluded_ids.add(a)
+
+    isic = load_isic_training_frame(isic_rows)
+    ham = baseline[baseline.split.isin(["train", "val"])].copy()
+    ham = ham[~ham.image_id.astype(str).isin(ham_excluded_ids)].copy()
+    ham["y"] = ham.dx.map(HAM_TO_IDX)
+    ham = ham.dropna(subset=["y"]).copy()
+    ham["y"] = ham.y.astype("int32")
+    ham["image"] = ham.image_id.astype(str)
+    ham["dataset"] = "HAM10000"
+    isic["dataset"] = "ISIC2019"
+    isic_share = cfg["train_frac"] / (cfg["train_frac"] + cfg["val_frac"])
+    isic = _isic_train_val(isic, cfg["seed"], isic_share, duplicate_ids)
+
+    combined = pd.concat([
+        ham[["image", "path", "dx", "y", "lesion_id", "split", "dataset"]],
+        isic.assign(lesion_id=isic.lesion_group)[["image", "path", "dx", "y", "lesion_id", "split", "dataset"]],
+        baseline[baseline.split == "test"].assign(dataset="HAM10000", image=lambda d: d.image_id.astype(str))
+            .assign(y=lambda d: d.dx.map(HAM_TO_IDX))[["image", "path", "dx", "y", "lesion_id", "split", "dataset"]],
+    ], ignore_index=True)
+    combined["y"] = combined.y.astype("int32")
+    # Group and duplicate leakage checks; test rows remain byte-for-byte assigned by the old manifest.
+    _require_split_integrity(combined.rename(columns={"lesion_id": "lesion_id"}))
+    old_test = baseline.loc[baseline.split == "test", "image_id"].astype(str).tolist()
+    new_test = combined.loc[combined.split == "test", "image"].astype(str).tolist()
+    if old_test != new_test:
+        raise RuntimeError("Combined manifest changed the original test rows or order; refusing training.")
+    combined["source_image_id"] = combined.image
+    combined.to_csv(out / "combined_splits.csv", index=False)
+    summary = {
+        "original_test_preserved": True,
+        "ham_cross_split_duplicate_candidates": len(ham_conflicts),
+        "excluded_ham_training_or_validation_rows": len(ham_excluded_ids),
+        "isic_candidates_overlapping_ham_test": sum(p["ham_split"] == "test" for p in report["exact_duplicate_pairs_with_ham"] + report["near_duplicate_pairs_with_ham"]),
+        "excluded_isic_duplicate_candidates": len(duplicate_ids),
+        "isic_compatible_rows_before_exclusions": int(len(isic_rows[(isic_rows.label_status == "compatible") & isic_rows.path.notna()])),
+        "isic_rows_used": int(len(isic)),
+        "split_class_counts": {s: {c: int(((combined.split == s) & (combined.dx == c)).sum()) for c in CLASSES}
+                               for s in ("train", "val", "test")},
+    }
+    (out / "combined_dataset_report.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    train = combined[combined.split == "train"]
+    val = combined[combined.split == "val"]
+    if train.empty or val.empty:
+        raise RuntimeError("Training or validation split is empty.")
+    for part in (train, val):
+        missing = [p for p in part.path if not Path(p).is_file()]
+        if missing:
+            raise FileNotFoundError(f"{len(missing)} images are missing from {part.iloc[0].dataset} split; sample: {missing[:3]}")
+    train_ds = make_dataset(train.path, train.y, cfg["img_size"], args.batch_size, training=True, seed=cfg["seed"])
+    val_ds = make_dataset(val.path, val.y, cfg["img_size"], args.batch_size)
+    weights = compute_class_weight("balanced", classes=np.arange(len(CLASSES)), y=train.y.values)
+    class_weight = {i: float(w) for i, w in enumerate(weights)}
+
+    old_path = _resolve(cfg["model_path"])
+    new_path = _resolve(cfg.get("new_model_path", "models/isic_finetuned.keras"))
+    class_path = _resolve(cfg["class_indices_path"])
+    expected = {c: i for i, c in enumerate(CLASSES)}
+    if json.loads(class_path.read_text(encoding="utf-8")) != expected:
+        raise RuntimeError("Existing class order does not match the seven configured HAM classes.")
+    if args.resume:
+        if not new_path.is_file():
+            raise FileNotFoundError(f"Cannot resume: {new_path} does not exist")
+        model = tf.keras.models.load_model(new_path, compile=False)
+    else:
+        if not old_path.is_file():
+            raise FileNotFoundError(f"Original checkpoint not found: {old_path}")
+        model = tf.keras.models.load_model(old_path, compile=False)
+    if tuple(model.input_shape[1:]) != (cfg["img_size"], cfg["img_size"], 3) or model.output_shape[-1] != len(CLASSES):
+        raise ValueError(f"Checkpoint is incompatible: input={model.input_shape}, output={model.output_shape}")
+    base = model.get_layer("efficientnetb0")
+    base.trainable = True
+    frozen_prefix = max(0, len(base.layers) - args.finetune_layers)
+    for layer in base.layers[:frozen_prefix]:
+        layer.trainable = False
+    for layer in base.layers:
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = False
+    model.compile(optimizer=tf.keras.optimizers.Adam(args.learning_rate),
+                  loss="sparse_categorical_crossentropy", metrics=["accuracy"])
+    callbacks = [
+        tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=4, restore_best_weights=True),
+        tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.3, patience=2, min_lr=1e-7),
+        tf.keras.callbacks.ModelCheckpoint(str(new_path), monitor="val_loss", save_best_only=True),
+        tf.keras.callbacks.CSVLogger(str(out / "isic_training_log.csv"), append=args.resume),
+    ]
+    history = model.fit(train_ds, validation_data=val_ds, epochs=args.epochs,
+                        class_weight=class_weight, callbacks=callbacks)
+    (out / "isic_training_history.json").write_text(
+        json.dumps({k: [float(x) for x in v] for k, v in history.history.items()}, indent=2), encoding="utf-8")
+    model_cfg = {**cfg, "source_model": str(old_path), "model_path": str(new_path),
+                 "class_to_idx": expected, "seed": cfg["seed"], "epochs_run": len(history.epoch),
+                 "learning_rate": args.learning_rate, "batch_size": args.batch_size,
+                 "fine_tuned_layers": args.finetune_layers, "isic_root": str(Path(args.isic_root).resolve())}
+    (models / "isic_training_config.json").write_text(json.dumps(model_cfg, indent=2), encoding="utf-8")
+    print(f"Saved fine-tuned model to {new_path}")
+
+
+if __name__ == "__main__":
+    main()

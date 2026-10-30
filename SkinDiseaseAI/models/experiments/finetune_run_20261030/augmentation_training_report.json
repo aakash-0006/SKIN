@@ -1,0 +1,145 @@
+{
+  "timestamp": "2026-10-30T06:28:57.535456",
+  "source_checkpoint": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\isic_finetuned.keras",
+  "saved_model_path": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\isic_augmented_v1.keras",
+  "epochs_requested": 10,
+  "epochs_completed": 6,
+  "best_epoch": 2,
+  "best_val_loss": 0.9810401797294617,
+  "training_duration_seconds": 1006.81,
+  "training_duration_minutes": 16.78,
+  "hyperparameters": {
+    "batch_size": 32,
+    "learning_rate": 1e-05,
+    "finetuned_layers": 40,
+    "img_size": 224,
+    "seed": 42
+  },
+  "augmentation": {
+    "enabled": true,
+    "type": "online_keras_sequential",
+    "horizontal_flip": true,
+    "vertical_flip": false,
+    "max_rotation_degrees": 20.0,
+    "zoom_range": "\u00b18%",
+    "translation_range": "\u00b15%",
+    "active_in_training": true,
+    "active_in_validation_testing": false
+  },
+  "class_weighting": {
+    "strategy": "balanced_capped",
+    "max_cap": 5.0,
+    "total_training_samples": 16546,
+    "class_counts": {
+      "akiec": 690,
+      "bcc": 2396,
+      "bkl": 1746,
+      "df": 173,
+      "mel": 3138,
+      "nv": 8229,
+      "vasc": 174
+    },
+    "raw_balanced_weights": {
+      "akiec": 3.4257,
+      "bcc": 0.9865,
+      "bkl": 1.3538,
+      "df": 13.6631,
+      "mel": 0.7533,
+      "nv": 0.2872,
+      "vasc": 13.5846
+    },
+    "applied_weights": {
+      "akiec": 3.4257,
+      "bcc": 0.9865,
+      "bkl": 1.3538,
+      "df": 5.0,
+      "mel": 0.7533,
+      "nv": 0.2872,
+      "vasc": 5.0
+    },
+    "ratios_vs_nv": {
+      "akiec": 11.93,
+      "bcc": 3.43,
+      "bkl": 4.71,
+      "df": 17.41,
+      "mel": 2.62,
+      "nv": 1.0,
+      "vasc": 17.41
+    }
+  },
+  "dataset_splits": {
+    "manifest": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\outputs\\combined_splits.csv",
+    "train_samples": 16546,
+    "val_samples": 3440,
+    "test_samples": 1494,
+    "train_counts_by_class": {
+      "akiec": 690,
+      "bcc": 2396,
+      "bkl": 1746,
+      "df": 173,
+      "mel": 3138,
+      "nv": 8229,
+      "vasc": 174
+    },
+    "val_counts_by_class": {
+      "akiec": 208,
+      "bcc": 523,
+      "bkl": 393,
+      "df": 44,
+      "mel": 629,
+      "nv": 1604,
+      "vasc": 39
+    },
+    "test_counts_by_class": {
+      "akiec": 63,
+      "bcc": 68,
+      "bkl": 152,
+      "df": 7,
+      "mel": 187,
+      "nv": 996,
+      "vasc": 21
+    }
+  },
+  "history": {
+    "accuracy": [
+      0.63514,
+      0.63224,
+      0.64445,
+      0.64499,
+      0.64747,
+      0.65121
+    ],
+    "loss": [
+      0.8284,
+      0.81214,
+      0.77909,
+      0.77967,
+      0.76223,
+      0.75394
+    ],
+    "val_accuracy": [
+      0.59564,
+      0.61192,
+      0.6093,
+      0.60523,
+      0.60756,
+      0.61105
+    ],
+    "val_loss": [
+      1.01846,
+      0.98104,
+      0.98728,
+      0.98735,
+      0.99142,
+      0.98721
+    ],
+    "learning_rate": [
+      1e-05,
+      1e-05,
+      1e-05,
+      1e-05,
+      0.0,
+      0.0
+    ]
+  }
+}

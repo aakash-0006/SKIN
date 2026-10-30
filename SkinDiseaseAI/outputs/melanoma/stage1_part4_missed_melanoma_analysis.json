@@ -1,0 +1,394 @@
+{
+  "original": {
+    "val_ham": {
+      "total_mel": 156,
+      "correct_mel": 92,
+      "missed_mel": 64,
+      "mel_recall": 0.5897,
+      "mistaken_for": {
+        "akiec": {
+          "count": 2,
+          "pct_of_missed": 3.1
+        },
+        "bcc": {
+          "count": 8,
+          "pct_of_missed": 12.5
+        },
+        "bkl": {
+          "count": 38,
+          "pct_of_missed": 59.4
+        },
+        "df": {
+          "count": 1,
+          "pct_of_missed": 1.6
+        },
+        "nv": {
+          "count": 15,
+          "pct_of_missed": 23.4
+        },
+        "vasc": {
+          "count": 0,
+          "pct_of_missed": 0.0
+        }
+      }
+    },
+    "val_all": {
+      "total_mel": 629,
+      "correct_mel": 273,
+      "missed_mel": 356,
+      "mel_recall": 0.434,
+      "mistaken_for": {
+        "akiec": {
+          "count": 7,
+          "pct_of_missed": 2.0
+        },
+        "bcc": {
+          "count": 19,
+          "pct_of_missed": 5.3
+        },
+        "bkl": {
+          "count": 233,
+          "pct_of_missed": 65.4
+        },
+        "df": {
+          "count": 8,
+          "pct_of_missed": 2.2
+        },
+        "nv": {
+          "count": 80,
+          "pct_of_missed": 22.5
+        },
+        "vasc": {
+          "count": 9,
+          "pct_of_missed": 2.5
+        }
+      }
+    },
+    "test": {
+      "total_mel": 187,
+      "correct_mel": 100,
+      "missed_mel": 87,
+      "mel_recall": 0.5348,
+      "mistaken_for": {
+        "akiec": {
+          "count": 3,
+          "pct_of_missed": 3.4
+        },
+        "bcc": {
+          "count": 8,
+          "pct_of_missed": 9.2
+        },
+        "bkl": {
+          "count": 44,
+          "pct_of_missed": 50.6
+        },
+        "df": {
+          "count": 5,
+          "pct_of_missed": 5.7
+        },
+        "nv": {
+          "count": 25,
+          "pct_of_missed": 28.7
+        },
+        "vasc": {
+          "count": 2,
+          "pct_of_missed": 2.3
+        }
+      }
+    }
+  },
+  "isic_augmented_v1": {
+    "val_ham": {
+      "total_mel": 156,
+      "correct_mel": 53,
+      "missed_mel": 103,
+      "mel_recall": 0.3397,
+      "mistaken_for": {
+        "akiec": {
+          "count": 6,
+          "pct_of_missed": 5.8
+        },
+        "bcc": {
+          "count": 7,
+          "pct_of_missed": 6.8
+        },
+        "bkl": {
+          "count": 65,
+          "pct_of_missed": 63.1
+        },
+        "df": {
+          "count": 1,
+          "pct_of_missed": 1.0
+        },
+        "nv": {
+          "count": 24,
+          "pct_of_missed": 23.3
+        },
+        "vasc": {
+          "count": 0,
+          "pct_of_missed": 0.0
+        }
+      }
+    },
+    "val_all": {
+      "total_mel": 629,
+      "correct_mel": 309,
+      "missed_mel": 320,
+      "mel_recall": 0.4913,
+      "mistaken_for": {
+        "akiec": {
+          "count": 20,
+          "pct_of_missed": 6.2
+        },
+        "bcc": {
+          "count": 32,
+          "pct_of_missed": 10.0
+        },
+        "bkl": {
+          "count": 195,
+          "pct_of_missed": 60.9
+        },
+        "df": {
+          "count": 3,
+          "pct_of_missed": 0.9
+        },
+        "nv": {
+          "count": 68,
+          "pct_of_missed": 21.2
+        },
+        "vasc": {
+          "count": 2,
+          "pct_of_missed": 0.6
+        }
+      }
+    },
+    "test": {
+      "total_mel": 187,
+      "correct_mel": 71,
+      "missed_mel": 116,
+      "mel_recall": 0.3797,
+      "mistaken_for": {
+        "akiec": {
+          "count": 12,
+          "pct_of_missed": 10.3
+        },
+        "bcc": {
+          "count": 7,
+          "pct_of_missed": 6.0
+        },
+        "bkl": {
+          "count": 60,
+          "pct_of_missed": 51.7
+        },
+        "df": {
+          "count": 3,
+          "pct_of_missed": 2.6
+        },
+        "nv": {
+          "count": 34,
+          "pct_of_missed": 29.3
+        },
+        "vasc": {
+          "count": 0,
+          "pct_of_missed": 0.0
+        }
+      }
+    }
+  },
+  "isic_augmented_v1_f2_threshold": {
+    "val_ham": {
+      "total_mel": 156,
+      "correct_mel": 131,
+      "missed_mel": 25,
+      "mel_recall": 0.8397,
+      "mistaken_for": {
+        "akiec": {
+          "count": 4,
+          "pct_of_missed": 16.0
+        },
+        "bcc": {
+          "count": 4,
+          "pct_of_missed": 16.0
+        },
+        "bkl": {
+          "count": 12,
+          "pct_of_missed": 48.0
+        },
+        "df": {
+          "count": 1,
+          "pct_of_missed": 4.0
+        },
+        "nv": {
+          "count": 4,
+          "pct_of_missed": 16.0
+        },
+        "vasc": {
+          "count": 0,
+          "pct_of_missed": 0.0
+        }
+      }
+    },
+    "val_all": {
+      "total_mel": 629,
+      "correct_mel": 560,
+      "missed_mel": 69,
+      "mel_recall": 0.8903,
+      "mistaken_for": {
+        "akiec": {
+          "count": 10,
+          "pct_of_missed": 14.5
+        },
+        "bcc": {
+          "count": 18,
+          "pct_of_missed": 26.1
+        },
+        "bkl": {
+          "count": 30,
+          "pct_of_missed": 43.5
+        },
+        "df": {
+          "count": 3,
+          "pct_of_missed": 4.3
+        },
+        "nv": {
+          "count": 7,
+          "pct_of_missed": 10.1
+        },
+        "vasc": {
+          "count": 1,
+          "pct_of_missed": 1.4
+        }
+      }
+    },
+    "test": {
+      "total_mel": 187,
+      "correct_mel": 139,
+      "missed_mel": 48,
+      "mel_recall": 0.7433,
+      "mistaken_for": {
+        "akiec": {
+          "count": 7,
+          "pct_of_missed": 14.6
+        },
+        "bcc": {
+          "count": 7,
+          "pct_of_missed": 14.6
+        },
+        "bkl": {
+          "count": 19,
+          "pct_of_missed": 39.6
+        },
+        "df": {
+          "count": 2,
+          "pct_of_missed": 4.2
+        },
+        "nv": {
+          "count": 13,
+          "pct_of_missed": 27.1
+        },
+        "vasc": {
+          "count": 0,
+          "pct_of_missed": 0.0
+        }
+      }
+    }
+  },
+  "ensemble_standard": {
+    "val_ham": {
+      "total_mel": 156,
+      "correct_mel": 76,
+      "missed_mel": 80,
+      "mel_recall": 0.4872,
+      "mistaken_for": {
+        "akiec": {
+          "count": 3,
+          "pct_of_missed": 3.8
+        },
+        "bcc": {
+          "count": 7,
+          "pct_of_missed": 8.8
+        },
+        "bkl": {
+          "count": 50,
+          "pct_of_missed": 62.5
+        },
+        "df": {
+          "count": 1,
+          "pct_of_missed": 1.2
+        },
+        "nv": {
+          "count": 19,
+          "pct_of_missed": 23.8
+        },
+        "vasc": {
+          "count": 0,
+          "pct_of_missed": 0.0
+        }
+      }
+    },
+    "val_all": {
+      "total_mel": 629,
+      "correct_mel": 307,
+      "missed_mel": 322,
+      "mel_recall": 0.4881,
+      "mistaken_for": {
+        "akiec": {
+          "count": 7,
+          "pct_of_missed": 2.2
+        },
+        "bcc": {
+          "count": 19,
+          "pct_of_missed": 5.9
+        },
+        "bkl": {
+          "count": 212,
+          "pct_of_missed": 65.8
+        },
+        "df": {
+          "count": 6,
+          "pct_of_missed": 1.9
+        },
+        "nv": {
+          "count": 74,
+          "pct_of_missed": 23.0
+        },
+        "vasc": {
+          "count": 4,
+          "pct_of_missed": 1.2
+        }
+      }
+    },
+    "test": {
+      "total_mel": 187,
+      "correct_mel": 92,
+      "missed_mel": 95,
+      "mel_recall": 0.492,
+      "mistaken_for": {
+        "akiec": {
+          "count": 5,
+          "pct_of_missed": 5.3
+        },
+        "bcc": {
+          "count": 7,
+          "pct_of_missed": 7.4
+        },
+        "bkl": {
+          "count": 51,
+          "pct_of_missed": 53.7
+        },
+        "df": {
+          "count": 5,
+          "pct_of_missed": 5.3
+        },
+        "nv": {
+          "count": 26,
+          "pct_of_missed": 27.4
+        },
+        "vasc": {
+          "count": 1,
+          "pct_of_missed": 1.1
+        }
+      }
+    }
+  }
+}

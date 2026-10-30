@@ -1,0 +1,8 @@
+class_name,class_index,ham_train_count,ham_val_count,ham_test_count,combined_train_count,combined_val_count,combined_test_count,train_class_fraction,raw_inverse_frequency_weight,capped_inverse_frequency_weight_cap5,ens_weight_beta_0_9999,ens_weight_beta_0_999,ens_weight_beta_0_99,power_smoothed_weight_0_6,test_support,test_support_status
+akiec,0,207,57,63,690,208,63,0.041702,3.425673,3.425673,0.710794,0.742315,0.943701,0.964900,63,Adequate support (>=20)
+bcc,1,381,65,68,2396,523,68,0.144808,0.986525,0.986525,0.222434,0.407156,0.942782,0.457193,68,Adequate support (>=20)
+bkl,2,741,206,152,1746,393,152,0.105524,1.353788,1.353788,0.295811,0.448255,0.942782,0.552796,152,Adequate support (>=20)
+df,3,89,19,7,173,44,7,0.010456,13.663088,5.000000,2.763123,2.328724,1.143802,2.212911,7,LOW SUPPORT (<20) - High variance
+mel,4,770,156,187,3138,629,187,0.189653,0.753255,0.753255,0.175957,0.386868,0.942782,0.388866,187,Adequate support (>=20)
+nv,5,4718,991,996,8229,1604,996,0.497341,0.287242,0.287242,0.084501,0.370215,0.942782,0.218064,996,Dominant class (66.7% of test)
+vasc,6,96,25,21,174,39,21,0.010516,13.584565,5.000000,2.747380,2.316466,1.141369,2.205271,21,Borderline support (>=20)

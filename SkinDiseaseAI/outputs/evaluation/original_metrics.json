@@ -1,0 +1,71 @@
+{
+  "model": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\best_model.keras",
+  "test_images": 1494,
+  "accuracy": 0.6760374832663989,
+  "macro_precision": 0.5119728220917786,
+  "macro_recall": 0.6348665684063446,
+  "macro_f1": 0.5326959401877663,
+  "weighted_f1": 0.704807861822806,
+  "per_class": {
+    "akiec": {
+      "test_count": 63,
+      "precision": 0.6153846153846154,
+      "recall": 0.38095238095238093,
+      "f1": 0.47058823529411764,
+      "metrics_reliability": "support threshold met"
+    },
+    "bcc": {
+      "test_count": 68,
+      "precision": 0.5657894736842105,
+      "recall": 0.6323529411764706,
+      "f1": 0.5972222222222222,
+      "metrics_reliability": "support threshold met"
+    },
+    "bkl": {
+      "test_count": 152,
+      "precision": 0.38489208633093525,
+      "recall": 0.7039473684210527,
+      "f1": 0.49767441860465117,
+      "metrics_reliability": "support threshold met"
+    },
+    "df": {
+      "test_count": 7,
+      "precision": 0.125,
+      "recall": 0.5714285714285714,
+      "f1": 0.20512820512820512,
+      "metrics_reliability": "low support; interpret cautiously"
+    },
+    "mel": {
+      "test_count": 187,
+      "precision": 0.35587188612099646,
+      "recall": 0.5347593582887701,
+      "f1": 0.42735042735042733,
+      "metrics_reliability": "support threshold met"
+    },
+    "nv": {
+      "test_count": 996,
+      "precision": 0.9431216931216931,
+      "recall": 0.7158634538152611,
+      "f1": 0.8139269406392694,
+      "metrics_reliability": "support threshold met"
+    },
+    "vasc": {
+      "test_count": 21,
+      "precision": 0.59375,
+      "recall": 0.9047619047619048,
+      "f1": 0.7169811320754716,
+      "metrics_reliability": "support threshold met"
+    }
+  },
+  "test_counts_by_class": {
+    "akiec": 63,
+    "bcc": 68,
+    "bkl": 152,
+    "df": 7,
+    "mel": 187,
+    "nv": 996,
+    "vasc": 21
+  },
+  "low_support_threshold": 20,
+  "interpretation": "Metrics for classes below the support threshold (df, vasc) are unstable and should be interpreted cautiously."
+}

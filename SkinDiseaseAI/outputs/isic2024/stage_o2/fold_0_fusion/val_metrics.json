@@ -1,0 +1,23 @@
+{
+  "roc_auc": 0.95783,
+  "pr_auc": 0.05753,
+  "pauc_20": 0.90539,
+  "pauc_tpr80": 0.9167,
+  "sensitivity": 0.48718,
+  "specificity": 0.98751,
+  "sensitivity_at_80_spec": 0.97436,
+  "precision": 0.03657,
+  "f1_score": 0.06804,
+  "threshold": 0.5,
+  "confusion_matrix": {
+    "tn": 79132,
+    "fp": 1001,
+    "fn": 40,
+    "tp": 38
+  },
+  "sample_counts": {
+    "total": 80211,
+    "positives": 78,
+    "negatives": 80133
+  }
+}

@@ -1,0 +1,468 @@
+"""Inference utilities used by the Streamlit app."""
+import json
+from functools import lru_cache
+from pathlib import Path
+
+import numpy as np
+
+from src.dataset import CLASSES, PROJECT_DIR, load_config
+from src.gate import check_image
+from src.hand_validator import get_hand_validator
+from src.preprocessing import pil_to_array, quality_warnings, read_image_bytes
+
+NAMES = {
+    "akiec": "Actinic keratoses / intraepithelial carcinoma",
+    "bcc": "Basal cell carcinoma",
+    "bkl": "Benign keratosis-like lesions",
+    "df": "Dermatofibroma",
+    "mel": "Melanoma",
+    "nv": "Melanocytic nevus",
+    "vasc": "Vascular lesions",
+}
+EXPLAIN = {
+    "akiec": "A dataset label for actinic keratoses and intraepithelial carcinoma (e.g. Bowen's disease).",
+    "bcc": "A dataset label for basal cell carcinoma, a type of epithelial skin cancer.",
+    "bkl": "A dataset label grouping benign keratosis-like lesions (e.g. solar lentigines, seborrheic keratoses).",
+    "df": "A dataset label for dermatofibroma, a common benign fibrous skin lesion.",
+    "mel": "A dataset label for melanoma, a malignant tumour of pigment-producing cells.",
+    "nv": "A dataset label for melanocytic nevi, benign growths of pigment-producing cells (moles).",
+    "vasc": "A dataset label grouping vascular lesions (e.g. angiomas, angiokeratomas, pyogenic granulomas).",
+}
+DISCLAIMER = ("Educational research prototype - NOT a medical device. It was trained only on dermoscopic images of "
+              "seven pigmented-lesion categories and cannot tell whether skin is healthy or diagnose any condition. "
+              "See a qualified clinician for any skin concern.")
+
+
+class ModelNotReady(Exception):
+    pass
+
+
+# Feature toggle for normal hand anomaly detector: defaults to False (disabled) as required
+ENABLE_NORMAL_HAND_DETECTOR = False
+
+
+@lru_cache(maxsize=1)
+def get_normal_hand_pipeline():
+    """Lazily load the Stage D normal hand anomaly detector pipeline."""
+    from src.normal_hand.cropper import HandCropper
+    from src.normal_hand.feature_extractor import HandFeatureExtractor
+    from src.normal_hand.anomaly_detector import MahalanobisAnomalyDetector
+    from src.normal_hand.pipeline import NormalHandPipeline
+
+    model_path = PROJECT_DIR / "models" / "experiments" / "normal_hand_v1" / "hand_anomaly_baseline.npz"
+    if not model_path.exists():
+        raise FileNotFoundError(f"Hand anomaly baseline artifact missing at {model_path}")
+
+    cropper = HandCropper(pad_fraction=0.10, target_size=(224, 224))
+    fe = HandFeatureExtractor(target_size=(224, 224))
+    detector = MahalanobisAnomalyDetector.load(str(model_path))
+    # Validate threshold matches Stage D exactly (8.768)
+    expected_threshold = 8.768
+    if abs(detector.threshold - expected_threshold) > 0.01:
+        detector.threshold = expected_threshold
+
+    return NormalHandPipeline(cropper=cropper, feature_extractor=fe, anomaly_detector=detector)
+
+
+@lru_cache(maxsize=4)
+def load_artifacts(model_path=None):
+    try:
+        import keras
+        load_fn = keras.models.load_model
+    except Exception:
+        import tensorflow as tf
+        load_fn = tf.keras.models.load_model
+    cfg = load_config()
+    mp = Path(model_path).expanduser().resolve() if model_path else PROJECT_DIR / cfg["model_path"]
+    cp = PROJECT_DIR / cfg["class_indices_path"]
+    if not mp.exists() or not cp.exists():
+        raise ModelNotReady(f"Model or class mapping is missing: {mp}")
+    with open(cp) as f:
+        c2i = json.load(f)
+    if set(c2i) != set(CLASSES) or sorted(c2i.values()) != list(range(len(CLASSES))):
+        raise ModelNotReady(f"Class mapping is incompatible with the seven expected classes: {cp}")
+    model = load_fn(mp, compile=False)
+    if tuple(model.input_shape[1:]) != (cfg["img_size"], cfg["img_size"], 3) or model.output_shape[-1] != len(CLASSES):
+        raise ModelNotReady(f"Selected model has incompatible input/output shapes: {model.input_shape}/{model.output_shape}")
+    idx_to_class = {int(v): k for k, v in c2i.items()}
+    return model, idx_to_class, cfg["img_size"]
+
+
+def predict_bytes(data, model_path=None, require_hand_validation=True, validation_mode="all_skin"):
+    """Pipeline: Input -> Human Skin/Hand Verification -> Spoof Screening -> Quality Check -> Disease Classifier.
+
+    Parameters:
+    - data: raw image bytes.
+    - model_path: optional path to specific .keras model.
+    - require_hand_validation: backwards-compatible boolean flag.
+    - validation_mode:
+      - "all_skin" (Default): validates human skin anywhere on the body (arms, legs, face, back, hands, dermoscopy).
+      - "hand_only": strictly requires MediaPipe hand landmarks.
+      - "bypass": skips input validation (dermoscopy research only).
+    """
+    effective_mode = validation_mode
+    if not require_hand_validation or validation_mode == "bypass":
+        effective_mode = "bypass"
+    elif validation_mode == "hand_only":
+        effective_mode = "hand_only"
+    else:
+        effective_mode = "all_skin"
+
+    # When ENABLE_NORMAL_HAND_DETECTOR is enabled, route macro-camera hand photos exclusively to the hand pipeline
+    if ENABLE_NORMAL_HAND_DETECTOR and effective_mode != "bypass":
+        if not data:
+            return {
+                "ok": False,
+                "is_hand": False,
+                "stage_failed": "file_format",
+                "message": "The file is empty.",
+                "errors": ["The file is empty."],
+                "code": None,
+                "scores": [],
+            }
+        import cv2
+        nparr = np.frombuffer(data, np.uint8) if data else None
+        img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR) if (nparr is not None and len(nparr) > 0) else None
+        if img_bgr is not None:
+            try:
+                pipeline = get_normal_hand_pipeline()
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "is_hand": True,
+                    "stage_failed": "hand_model_missing",
+                    "status": "error",
+                    "message": f"Normal hand detector error: {str(e)}",
+                    "errors": [f"Normal hand detector error: {str(e)}"],
+                    "warnings": [],
+                    "code": None,
+                    "name": None,
+                    "scores": [],
+                    "top3": [],
+                    "melanoma_flag": False,
+                    "hand_analysis": None,
+                    "normal_hand_detector_enabled": True,
+                }
+            crop_res = pipeline.cropper.crop_hand(img_bgr)
+            if crop_res.success or crop_res.hand_count >= 1:
+                # Macro-camera hand photo detected: route EXCLUSIVELY through hand-appearance pipeline
+                insp_res = pipeline.inspect_image(img_bgr)
+                hand_analysis = {
+                    "decision": insp_res.decision,
+                    "is_anomaly": insp_res.is_anomaly,
+                    "anomaly_score": round(insp_res.anomaly_score, 3),
+                    "threshold": round(insp_res.threshold, 3),
+                    "hand_detected": insp_res.hand_detected,
+                    "message": insp_res.message,
+                    "details": insp_res.details,
+                    "crop_shape": insp_res.crop_shape,
+                }
+                return {
+                    "ok": True,
+                    "is_hand": True,
+                    "abstained": False,
+                    "code": None,
+                    "name": None,
+                    "explanation": None,
+                    "scores": [],
+                    "top3": [],
+                    "message": insp_res.message,
+                    "warnings": [],
+                    "errors": [],
+                    "stage_failed": None,
+                    "input_type": "Hand photo (macro camera)",
+                    "anatomical_region": "Hand photo (macro camera)",
+                    "hand_count": crop_res.hand_count,
+                    "hand_details": [],
+                    "skin_fraction": 1.0,
+                    "quality_metrics": {},
+                    "spoof_analysis": {},
+                    "annotated_image": None,
+                    "hand_validation": None,
+                    "validation_result": None,
+                    "gate_verdict": None,
+                    "melanoma_flag": False,
+                    "melanoma_flag_info": None,
+                    "hand_analysis": hand_analysis,
+                    "normal_hand_detector_enabled": True,
+                }
+
+    # 1. Stage 1: Domain Gate (Mahalanobis distance & quality checks on dermoscopic domain)
+    gate_verdict = None
+    if effective_mode != "bypass":
+        gate_verdict = check_image(data)
+        if gate_verdict.get("status") == "rejected":
+            return {
+                "ok": False,
+                "is_hand": False,
+                "abstained": True,
+                "stage_failed": "domain_gate",
+                "status": "rejected",
+                "gate_verdict": gate_verdict,
+                "errors": gate_verdict.get("reasons", []),
+                "message": "No condition label shown. This photo is outside the validated domain (dermoscopy).",
+                "warnings": [],
+                "reasons": gate_verdict.get("reasons", []),
+                "anatomical_region": "Rejected by domain gate",
+                "input_type": "Rejected by domain gate",
+                "hand_count": 0,
+                "hand_details": [],
+                "skin_fraction": 0.0,
+                "quality_metrics": gate_verdict.get("details", {}).get("quality", {}),
+                "spoof_analysis": {},
+                "annotated_image": None,
+                "hand_validation": None,
+                "validation_result": None,
+                "melanoma_flag": False,
+                "melanoma_flag_info": None,
+                "code": None,
+                "name": None,
+                "scores": [],
+                "top3": [],
+            }
+
+    # 2. Stage 2-4: Human Skin Pixels, Anti-Spoof & Hand Landmark Validation
+    val_res = None
+    if effective_mode != "bypass":
+        validator = get_hand_validator()
+        val_res = validator.validate_image_bytes(data, mode=effective_mode)
+
+        if not val_res.passed:
+            # STOP processing: strictly do not invoke disease classifier
+            return {
+                "ok": False,
+                "is_hand": False,
+                "stage_failed": val_res.stage_failed,
+                "status": val_res.status,
+                "gate_verdict": gate_verdict,
+                "errors": val_res.reasons,
+                "warnings": val_res.warnings,
+                "anatomical_region": val_res.anatomical_region,
+                "input_type": val_res.input_type,
+                "hand_count": val_res.hand_count,
+                "hand_details": val_res.hand_details,
+                "skin_fraction": val_res.skin_fraction,
+                "quality_metrics": val_res.quality_metrics,
+                "spoof_analysis": val_res.spoof_analysis,
+                "annotated_image": val_res.annotated_image,
+                "hand_validation": val_res,
+                "validation_result": val_res,
+                "melanoma_flag": False,
+                "melanoma_flag_info": None,
+                "code": None,
+                "name": None,
+                "scores": [],
+                "top3": [],
+                "message": val_res.reasons[0] if val_res.reasons else "Validation failed",
+            }
+
+        # Stage Hand Check: Hand photos must NEVER receive a disease label
+        if val_res.hand_count >= 1:
+            hand_analysis = None
+            if ENABLE_NORMAL_HAND_DETECTOR:
+                try:
+                    pipeline = get_normal_hand_pipeline()
+                    import cv2
+                    nparr = np.frombuffer(data, np.uint8)
+                    img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if img_bgr is not None:
+                        insp_res = pipeline.inspect_image(img_bgr)
+                        hand_analysis = {
+                            "decision": insp_res.decision,
+                            "is_anomaly": insp_res.is_anomaly,
+                            "anomaly_score": round(insp_res.anomaly_score, 3),
+                            "threshold": round(insp_res.threshold, 3),
+                            "hand_detected": insp_res.hand_detected,
+                            "message": insp_res.message,
+                            "details": insp_res.details,
+                            "crop_shape": insp_res.crop_shape,
+                        }
+                    else:
+                        hand_analysis = {
+                            "decision": "UNSUITABLE_OR_UNCERTAIN_INPUT",
+                            "is_anomaly": True,
+                            "anomaly_score": -1.0,
+                            "threshold": 8.768,
+                            "hand_detected": False,
+                            "message": "Input unreadable: Could not decode image bytes.",
+                            "details": {"failure_reason": "DECODE_ERROR"},
+                        }
+                except Exception as e:
+                    hand_analysis = {
+                        "decision": "UNSUITABLE_OR_UNCERTAIN_INPUT",
+                        "is_anomaly": True,
+                        "anomaly_score": -1.0,
+                        "threshold": 8.768,
+                        "hand_detected": False,
+                        "message": f"Normal hand detector error: {str(e)}",
+                        "details": {"error": str(e)},
+                    }
+
+            return {
+                "ok": True,
+                "is_hand": True,
+                "abstained": False,
+                "code": None,
+                "name": None,
+                "explanation": None,
+                "scores": [],
+                "top3": [],
+                "message": (
+                    hand_analysis["message"]
+                    if (hand_analysis and hand_analysis.get("message"))
+                    else "Hand detected. This system cannot yet tell normal skin from a skin condition."
+                ),
+                "warnings": val_res.warnings,
+                "errors": [],
+                "stage_failed": None,
+                "input_type": "Hand photo (unvalidated domain)",
+                "anatomical_region": "Hand photo (unvalidated domain)",
+                "hand_count": val_res.hand_count,
+                "hand_details": val_res.hand_details,
+                "skin_fraction": val_res.skin_fraction,
+                "quality_metrics": val_res.quality_metrics,
+                "spoof_analysis": val_res.spoof_analysis,
+                "annotated_image": val_res.annotated_image,
+                "hand_validation": val_res,
+                "validation_result": val_res,
+                "gate_verdict": gate_verdict,
+                "melanoma_flag": False,
+                "melanoma_flag_info": None,
+                "hand_analysis": hand_analysis,
+                "normal_hand_detector_enabled": ENABLE_NORMAL_HAND_DETECTOR,
+            }
+
+    # 3. File decoding for classifier
+    img, errors, warnings = read_image_bytes(data)
+    if errors:
+        return {"ok": False, "errors": errors, "warnings": warnings, "stage_failed": "file_format", "code": None, "score": None, "scores": [], "melanoma_flag": False}
+
+    if val_res:
+        warnings += val_res.warnings
+    else:
+        warnings += quality_warnings(img)
+
+    # 4. Disease Classifier (unchanged argmax output + optional melanoma follow-up flag)
+    cfg = load_config()
+    thresh_cfg = cfg.get("melanoma_threshold_config", {})
+
+    if str(model_path).lower() == "ensemble":
+        orig_mp = PROJECT_DIR / cfg["model_path"]
+        aug_mp = PROJECT_DIR / cfg.get("augmented_model_path", "models/isic_augmented_v1.keras")
+        m_orig, idx_to_class, size = load_artifacts(str(orig_mp))
+        m_aug, _, _ = load_artifacts(str(aug_mp))
+        arr = pil_to_array(img, size)
+        p_orig = m_orig.predict(arr, verbose=0)[0]
+        p_aug = m_aug.predict(arr, verbose=0)[0]
+        probs = 0.5 * (p_orig + p_aug)
+        active_model_tag = "ensemble"
+    else:
+        model, idx_to_class, size = load_artifacts(str(model_path) if model_path else None)
+        probs = model.predict(pil_to_array(img, size), verbose=0)[0]
+        mp_str = str(model_path) if model_path else cfg.get("model_path", "")
+        if "isic_augmented_v1" in mp_str:
+            active_model_tag = "isic_augmented_v1"
+        else:
+            active_model_tag = "other"
+
+    order = np.argsort(probs)[::-1]
+    top = [(idx_to_class[int(i)], float(probs[i])) for i in order[:3]]
+    code, score = top[0]
+    input_type_val = val_res.input_type if val_res else "Unvalidated / Bypass"
+
+    # Abstain threshold chosen strictly on HAM10000 validation split:
+    # t=0.40 keeps 90.4% (1373/1519) of valid dermoscopy with 80.1% accuracy.
+    # Rejects random or low-confidence predictions (e.g. 25.3%).
+    ABSTAIN_THRESHOLD = 0.40
+    if score < ABSTAIN_THRESHOLD:
+        return {
+            "ok": False,
+            "abstained": True,
+            "is_hand": False,
+            "stage_failed": "abstain_threshold",
+            "code": None,
+            "name": None,
+            "top_score_uncalibrated": score,
+            "explanation": None,
+            "scores": [],
+            "top3": [],
+            "message": "No condition label shown. This photo is outside the validated domain (dermoscopy).",
+            "warnings": warnings + [f"Top prediction score ({score:.1%}) is below the validation-calibrated abstain threshold ({ABSTAIN_THRESHOLD:.0%})."],
+            "errors": ["Top prediction confidence is below the abstain threshold."],
+            "input_type": input_type_val,
+            "anatomical_region": input_type_val,
+            "skin_fraction": val_res.skin_fraction if val_res else 0.0,
+            "melanoma_flag": False,
+            "melanoma_flag_info": None,
+            "gate_verdict": gate_verdict,
+            "hand_validation": val_res,
+            "validation_result": val_res,
+            "annotated_image": val_res.annotated_image if val_res else None,
+            "hand_count": val_res.hand_count if val_res else 0,
+            "quality_metrics": val_res.quality_metrics if val_res else {},
+            "spoof_analysis": val_res.spoof_analysis if val_res else {},
+        }
+
+    # Melanoma follow-up flag (applied strictly to the model it was calibrated for)
+    mel_idx = CLASSES.index("mel")
+    mel_prob = float(probs[mel_idx])
+    melanoma_flag = False
+    melanoma_flag_info = None
+
+    gate_accepted = (effective_mode == "bypass") or (gate_verdict is not None and gate_verdict.get("status") == "accepted")
+    if active_model_tag in thresh_cfg and gate_accepted:
+        t_calibrated = float(thresh_cfg[active_model_tag]["threshold"])
+        if mel_prob >= t_calibrated:
+            melanoma_flag = True
+            melanoma_flag_info = {
+                "flagged": True,
+                "threshold": t_calibrated,
+                "mel_prob": mel_prob,
+                "model_calibrated_for": active_model_tag,
+                "notice": (
+                    f"Melanoma Follow-up Flag: Estimated P(mel) = {mel_prob:.1%} exceeds the calibrated screening "
+                    f"threshold of {t_calibrated:.1%}. Measured values: about 60% sensitivity on HAM10000 validation, "
+                    "54% (95% CI 47-61%) on the test set, with about 11% of non-melanoma lesions flagged. "
+                    "No flag does NOT mean no melanoma. About 46% of melanomas in testing were not flagged. "
+                    "This is an exploratory follow-up screening flag, NOT a medical diagnosis; consultation with a qualified dermatologist is recommended."
+                ),
+            }
+        else:
+            melanoma_flag = False
+            melanoma_flag_info = {
+                "flagged": False,
+                "threshold": t_calibrated,
+                "mel_prob": mel_prob,
+                "model_calibrated_for": active_model_tag,
+                "notice": f"Estimated P(mel) = {mel_prob:.1%} is below the calibrated screening threshold ({t_calibrated:.1%}).",
+            }
+
+    if score < 0.5:
+        warnings.append("The top score is low, so this classification result is uncertain.")
+    warnings.append("Domain notice: model was evaluated on HAM10000 dermoscopic close-ups. Non-dermoscopic camera photos represent an unvalidated domain.")
+
+    all_scores = [(idx_to_class[int(i)], NAMES[idx_to_class[int(i)]], float(probs[i])) for i in range(len(probs))]
+
+    return {
+        "ok": True,
+        "is_hand": False,
+        "abstained": False,
+        "code": code,
+        "name": NAMES[code],
+        "score": score,
+        "explanation": EXPLAIN[code],
+        "scores": all_scores,
+        "top3": [(c, NAMES[c], s) for c, s in top],
+        "warnings": warnings,
+        "errors": [],
+        "stage_failed": None,
+        "input_type": input_type_val,
+        "anatomical_region": input_type_val,  # Backwards compatibility alias
+        "skin_fraction": val_res.skin_fraction if val_res else 0.0,
+        "melanoma_flag": melanoma_flag,
+        "melanoma_flag_info": melanoma_flag_info,
+        "hand_validation": val_res,
+        "validation_result": val_res,
+        "gate_verdict": gate_verdict,
+        "annotated_image": val_res.annotated_image if val_res else None,
+    }

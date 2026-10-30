@@ -1,0 +1,12 @@
+{
+  "total_images": 656,
+  "predicted_abnormal_rate_at_t05": 0.3567,
+  "mean_abnormal_probability": 0.369,
+  "benign_lesions_mean_prob": 0.3555,
+  "malignant_lesions_mean_prob": 0.4071,
+  "skin_tone_breakdown": {
+    "FST_12": 0.3769,
+    "FST_34": 0.3476,
+    "FST_56": 0.3859
+  }
+}

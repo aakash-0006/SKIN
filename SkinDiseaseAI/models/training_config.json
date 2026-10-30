@@ -1,0 +1,28 @@
+{
+  "dataset_root": "D:\\DOWNLOADS D\\archive",
+  "img_size": 224,
+  "batch_size": 32,
+  "seed": 42,
+  "train_frac": 0.7,
+  "val_frac": 0.15,
+  "epochs": 15,
+  "finetune_epochs": 10,
+  "finetune_layers": 40,
+  "lr": 0.001,
+  "finetune_lr": 1e-05,
+  "dropout": 0.3,
+  "model_path": "models/best_model.keras",
+  "class_indices_path": "models/class_indices.json",
+  "class_to_idx": {
+    "akiec": 0,
+    "bcc": 1,
+    "bkl": 2,
+    "df": 3,
+    "mel": 4,
+    "nv": 5,
+    "vasc": 6
+  },
+  "tf_version": "2.21.0",
+  "epochs_run": 20,
+  "best_val_loss": 0.8138176798820496
+}

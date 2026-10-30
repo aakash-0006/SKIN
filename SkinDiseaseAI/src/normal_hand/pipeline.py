@@ -1,0 +1,119 @@
+"""End-to-end inspection pipeline for normal hand appearance.
+
+Educational research prototype - NOT a medical device.
+Produces cautious, medically responsible outputs:
+- USABLE_HAND_IMAGE
+- UNSUITABLE_OR_UNCERTAIN_INPUT
+- UNUSUAL_RELATIVE_TO_TRAINING_DATA
+"""
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, Tuple
+import cv2
+import numpy as np
+
+from .cropper import HandCropper, CropResult
+from .feature_extractor import HandFeatureExtractor
+from .anomaly_detector import MahalanobisAnomalyDetector
+
+
+@dataclass
+class HandInspectionResult:
+    decision: str  # "USABLE_HAND_IMAGE", "UNSUITABLE_OR_UNCERTAIN_INPUT", "UNUSUAL_RELATIVE_TO_TRAINING_DATA"
+    is_anomaly: bool
+    anomaly_score: float
+    threshold: float
+    hand_detected: bool
+    hand_count: int
+    crop_shape: Optional[Tuple[int, int]] = None
+    message: str = ""
+    details: Dict[str, Any] = field(default_factory=dict)
+
+
+class NormalHandPipeline:
+    """Full inference pipeline combining structural suitability with embedding anomaly detection."""
+
+    def __init__(
+        self,
+        cropper: Optional[HandCropper] = None,
+        feature_extractor: Optional[HandFeatureExtractor] = None,
+        anomaly_detector: Optional[MahalanobisAnomalyDetector] = None,
+        normalize_features: bool = False,
+    ):
+        self.cropper = cropper or HandCropper()
+        self.feature_extractor = feature_extractor or HandFeatureExtractor()
+        self.anomaly_detector = anomaly_detector
+        self.normalize_features = normalize_features
+
+    def inspect_image(self, img_bgr: np.ndarray) -> HandInspectionResult:
+        """Inspect an image of a human hand.
+
+        Args:
+            img_bgr: Input BGR image array.
+
+        Returns:
+            HandInspectionResult with cautious category decision and metrics.
+        """
+        # Step 1: Structural Suitability & Cropping
+        crop_res = self.cropper.crop_hand(img_bgr)
+        if not crop_res.success:
+            return HandInspectionResult(
+                decision="UNSUITABLE_OR_UNCERTAIN_INPUT",
+                is_anomaly=True,
+                anomaly_score=-1.0,
+                threshold=self.anomaly_detector.threshold if (self.anomaly_detector and self.anomaly_detector.threshold) else -1.0,
+                hand_detected=False,
+                hand_count=crop_res.hand_count,
+                message=f"Input unsuitable: {crop_res.failure_reason}. Please upload a clear photo of a human hand.",
+                details={"failure_reason": crop_res.failure_reason},
+            )
+
+        # Step 2: Feature Extraction (L2-normalized for Candidate 1B)
+        feats = self.feature_extractor.extract_features(crop_res.cropped_bgr, normalize=self.normalize_features)
+
+        # Step 3: Anomaly Scoring
+        if self.anomaly_detector is None or not self.anomaly_detector.fitted:
+            return HandInspectionResult(
+                decision="UNSUITABLE_OR_UNCERTAIN_INPUT",
+                is_anomaly=False,
+                anomaly_score=-1.0,
+                threshold=-1.0,
+                hand_detected=True,
+                hand_count=crop_res.hand_count,
+                crop_shape=crop_res.crop_shape,
+                message="Hand detected, but anomaly detector model is not loaded.",
+                details={"bbox": crop_res.bbox},
+            )
+
+        score = float(self.anomaly_detector.score(feats)[0])
+        thr = float(self.anomaly_detector.threshold)
+        is_anom = score > thr
+
+        if is_anom:
+            decision = "UNUSUAL_RELATIVE_TO_TRAINING_DATA"
+            message = (
+                f"Appearance differs from reference normal hand dataset (score: {score:.2f} > threshold {thr:.2f}). "
+                "This visual variation may be caused by a lesion, rash, unusual lighting, angle, or foreign object. "
+                "Notice: This is an experimental visual check, NOT a medical diagnosis."
+            )
+        else:
+            decision = "USABLE_HAND_IMAGE"
+            message = (
+                f"Image appearance is consistent with reference normal hand skin dataset (score: {score:.2f} <= threshold {thr:.2f}). "
+                "Notice: A typical visual appearance does not guarantee medical health."
+            )
+
+        return HandInspectionResult(
+            decision=decision,
+            is_anomaly=is_anom,
+            anomaly_score=score,
+            threshold=thr,
+            hand_detected=True,
+            hand_count=crop_res.hand_count,
+            crop_shape=crop_res.crop_shape,
+            message=message,
+            details={
+                "bbox": crop_res.bbox,
+                "crop_shape": crop_res.crop_shape,
+                "distance_margin": round(score - thr, 2),
+            },
+        )

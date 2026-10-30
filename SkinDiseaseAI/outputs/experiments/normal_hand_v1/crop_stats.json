@@ -1,0 +1,22 @@
+{
+  "train": {
+    "total": 1934,
+    "success": 1934,
+    "failures": {}
+  },
+  "val": {
+    "total": 419,
+    "success": 419,
+    "failures": {}
+  },
+  "test": {
+    "total": 420,
+    "success": 420,
+    "failures": {}
+  },
+  "eval": {
+    "total": 96,
+    "success": 96,
+    "failures": {}
+  }
+}

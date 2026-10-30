@@ -1,0 +1,50 @@
+{
+    "dataset_root":  "D:\\DOWNLOADS D\\archive",
+    "isic_dataset_root":  "",
+    "existing_splits_path":  "outputs/splits.csv",
+    "new_model_path":  "models/isic_finetuned.keras",
+    "inspection_report_path":  "outputs/isic_dataset_report.json",
+    "near_duplicate_hamming_threshold":  4,
+    "min_reliable_support":  20,
+    "img_size":  224,
+    "batch_size":  32,
+    "seed":  42,
+    "train_frac":  0.70,
+    "val_frac":  0.15,
+    "epochs":  15,
+    "finetune_epochs":  10,
+    "finetune_layers":  40,
+    "lr":  0.001,
+    "finetune_lr":  0.00001,
+    "dropout":  0.3,
+    "model_path":  "models/best_model.keras",
+    "class_indices_path":  "models/class_indices.json",
+    "augmented_model_path": "models/isic_augmented_v1.keras",
+    "augmentation_history_csv": "outputs/augmentation_training_history.csv",
+    "augmentation_report_path": "outputs/augmentation_training_report.json",
+    "class_weight_cap": 5.0,
+    "melanoma_threshold_config": {
+        "isic_augmented_v1": {
+            "threshold": 0.2327,
+            "validation_split": "HAM10000 validation split (1,510 images, 156 melanomas)",
+            "selection_rule": "Highest threshold on HAM-val with mel recall >= 60% and macro F1 within 0.02 of argmax",
+            "validation_metrics": {
+                "mel_recall": 0.6026,
+                "mel_precision": 0.3701,
+                "macro_f1": 0.5689,
+                "accuracy": 0.7007
+            }
+        },
+        "ensemble": {
+            "threshold": 0.3466,
+            "validation_split": "HAM10000 validation split (1,510 images, 156 melanomas)",
+            "selection_rule": "Highest threshold on HAM-val with mel recall >= 60% and macro F1 within 0.02 of argmax",
+            "validation_metrics": {
+                "mel_recall": 0.6026,
+                "mel_precision": 0.4123,
+                "macro_f1": 0.5920,
+                "accuracy": 0.7132
+            }
+        }
+    }
+}

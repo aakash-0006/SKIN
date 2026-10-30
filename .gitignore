@@ -1,0 +1,21 @@
+# Python Virtual Environments
+.venv/
+.venv*/
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Temporary & checkpoint files
+.ipynb_checkpoints/
+*.tmp
+*.bak
+*.swp
+
+# Media & task files if too large
+*.task.bak

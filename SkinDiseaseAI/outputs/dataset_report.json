@@ -1,0 +1,23 @@
+{
+  "metadata_file": "D:\\DOWNLOADS D\\archive\\HAM10000_metadata.csv",
+  "metadata_rows": 10015,
+  "duplicate_image_id_rows_removed": 0,
+  "image_files_found": 10015,
+  "duplicate_filenames_in_different_folders": 0,
+  "metadata_rows_without_image": 0,
+  "missing_image_ids_sample": [],
+  "image_files_not_in_metadata": 0,
+  "unknown_class_labels": [],
+  "lesions_with_conflicting_labels": 0,
+  "unique_lesions": 7470,
+  "usable_images": 10015,
+  "class_counts": {
+    "nv": 6705,
+    "mel": 1113,
+    "bkl": 1099,
+    "bcc": 514,
+    "akiec": 327,
+    "vasc": 142,
+    "df": 115
+  }
+}

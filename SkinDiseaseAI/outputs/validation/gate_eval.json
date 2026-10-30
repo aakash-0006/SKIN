@@ -1,0 +1,47 @@
+{
+  "valid_test": {
+    "n": 1494,
+    "false_rejection": 0.018741633199464525,
+    "ci95": [
+      0.01299809383149606,
+      0.026953794272025697
+    ]
+  },
+  "valid_test_per_class": {
+    "akiec": {
+      "n": 63,
+      "rejected": 2,
+      "false_rejection": 0.0317
+    },
+    "bcc": {
+      "n": 68,
+      "rejected": 1,
+      "false_rejection": 0.0147
+    },
+    "bkl": {
+      "n": 152,
+      "rejected": 3,
+      "false_rejection": 0.0197
+    },
+    "df": {
+      "n": 7,
+      "rejected": 0,
+      "false_rejection": 0.0
+    },
+    "mel": {
+      "n": 187,
+      "rejected": 2,
+      "false_rejection": 0.0107
+    },
+    "nv": {
+      "n": 996,
+      "rejected": 19,
+      "false_rejection": 0.0191
+    },
+    "vasc": {
+      "n": 21,
+      "rejected": 1,
+      "false_rejection": 0.0476
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "original_test_preserved": true,
+  "ham_cross_split_duplicate_candidates": 145,
+  "excluded_ham_training_or_validation_rows": 81,
+  "isic_candidates_overlapping_ham_test": 3141,
+  "excluded_isic_duplicate_candidates": 11420,
+  "isic_compatible_rows_before_exclusions": 24703,
+  "isic_rows_used": 11546,
+  "split_class_counts": {
+    "train": {
+      "akiec": 690,
+      "bcc": 2396,
+      "bkl": 1746,
+      "df": 173,
+      "mel": 3138,
+      "nv": 8229,
+      "vasc": 174
+    },
+    "val": {
+      "akiec": 208,
+      "bcc": 523,
+      "bkl": 393,
+      "df": 44,
+      "mel": 629,
+      "nv": 1604,
+      "vasc": 39
+    },
+    "test": {
+      "akiec": 63,
+      "bcc": 68,
+      "bkl": 152,
+      "df": 7,
+      "mel": 187,
+      "nv": 996,
+      "vasc": 21
+    }
+  }
+}

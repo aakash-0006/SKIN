@@ -1,0 +1,71 @@
+{
+  "model": "D:\\DOWNLOADS D\\SkinDiseaseAI\\SkinDiseaseAI\\models\\isic_augmented_v1.keras",
+  "test_images": 1494,
+  "accuracy": 0.7228915662650602,
+  "macro_precision": 0.5614633789955285,
+  "macro_recall": 0.6511711994419028,
+  "macro_f1": 0.5784862781304986,
+  "weighted_f1": 0.7427722097708701,
+  "per_class": {
+    "akiec": {
+      "test_count": 63,
+      "precision": 0.45454545454545453,
+      "recall": 0.47619047619047616,
+      "f1": 0.46511627906976744,
+      "metrics_reliability": "support threshold met"
+    },
+    "bcc": {
+      "test_count": 68,
+      "precision": 0.6470588235294118,
+      "recall": 0.6470588235294118,
+      "f1": 0.6470588235294118,
+      "metrics_reliability": "support threshold met"
+    },
+    "bkl": {
+      "test_count": 152,
+      "precision": 0.34,
+      "recall": 0.7828947368421053,
+      "f1": 0.47410358565737054,
+      "metrics_reliability": "support threshold met"
+    },
+    "df": {
+      "test_count": 7,
+      "precision": 0.2222222222222222,
+      "recall": 0.5714285714285714,
+      "f1": 0.32,
+      "metrics_reliability": "low support; interpret cautiously"
+    },
+    "mel": {
+      "test_count": 187,
+      "precision": 0.5634920634920635,
+      "recall": 0.37967914438502676,
+      "f1": 0.4536741214057508,
+      "metrics_reliability": "support threshold met"
+    },
+    "nv": {
+      "test_count": 996,
+      "precision": 0.9429250891795482,
+      "recall": 0.7961847389558233,
+      "f1": 0.8633641807294502,
+      "metrics_reliability": "support threshold met"
+    },
+    "vasc": {
+      "test_count": 21,
+      "precision": 0.76,
+      "recall": 0.9047619047619048,
+      "f1": 0.8260869565217391,
+      "metrics_reliability": "support threshold met"
+    }
+  },
+  "test_counts_by_class": {
+    "akiec": 63,
+    "bcc": 68,
+    "bkl": 152,
+    "df": 7,
+    "mel": 187,
+    "nv": 996,
+    "vasc": 21
+  },
+  "low_support_threshold": 20,
+  "interpretation": "Metrics for classes below the support threshold (df, vasc) are unstable and should be interpreted cautiously."
+}

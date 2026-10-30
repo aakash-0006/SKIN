@@ -1,0 +1,9 @@
+tensorflow>=2.15
+numpy
+pandas
+scikit-learn
+matplotlib
+seaborn
+pillow
+streamlit>=1.30
+openai>=1.0

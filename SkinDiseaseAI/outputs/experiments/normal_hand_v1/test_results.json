@@ -1,0 +1,17 @@
+{
+  "total_test_images": 420,
+  "total_test_participants": 28,
+  "calibrated_threshold": 8.768,
+  "test_scores": {
+    "min": 3.231,
+    "p25": 5.074,
+    "median": 5.87,
+    "p75": 7.214,
+    "p90": 8.779,
+    "p95": 9.898,
+    "p99": 11.118,
+    "max": 14.304
+  },
+  "test_false_rejection_rate": 0.1024,
+  "test_flagged_count": 43
+}

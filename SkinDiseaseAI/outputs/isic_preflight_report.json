@@ -1,0 +1,52 @@
+{
+  "inspection_status": "preliminary_only_integrity_scan_not_run",
+  "dataset": "ISIC 2019 Training",
+  "dataset_root_observed": "D:\\DOWNLOADS D\\archive (1)",
+  "version_evidence": [
+    "ISIC_2019_Training_GroundTruth.csv",
+    "ISIC_2019_Training_Metadata.csv",
+    "Diagnosis columns MEL, NV, BCC, AK, BKL, DF, VASC, SCC, UNK"
+  ],
+  "ground_truth_rows": 25331,
+  "metadata_rows": 25331,
+  "image_files_found": 25331,
+  "image_files_by_source_diagnosis": {
+    "NV": 12875,
+    "MEL": 4522,
+    "BCC": 3323,
+    "BKL": 2624,
+    "SCC": 628,
+    "AK": 867,
+    "DF": 239,
+    "VASC": 253
+  },
+  "compatible_ham10000_image_count_before_integrity_exclusions": 24703,
+  "incompatible_diagnosis_count": {
+    "SCC": 628
+  },
+  "unlabeled_or_unmapped_ground_truth_rows_observed": 0,
+  "patient_id_columns": [],
+  "lesion_id_nonempty_rows": 23247,
+  "unique_nonempty_lesion_ids": 11847,
+  "ham10000_image_files_found": 10015,
+  "preserved_ham_test_rows": 1494,
+  "checkpoint_archive": {
+    "path": "models/best_model.keras",
+    "format": "Keras v3 archive",
+    "keras_version_in_archive_metadata": "3.15.1",
+    "input_shape": [null, 224, 224, 3],
+    "backbone": "EfficientNetB0",
+    "output_classes": 7,
+    "loaded_with_tensorflow": false,
+    "archive_config_inspected": true
+  },
+  "unverified_integrity_checks": {
+    "corrupt_or_invalid_images": null,
+    "exact_duplicates_with_ham": null,
+    "near_duplicates_with_ham": null,
+    "duplicate_overlap_with_existing_test": null,
+    "reason": "The available virtual environment's Python executable points to an unavailable base interpreter; no system Python launcher is installed."
+  },
+  "training_started": false,
+  "note": "This is a preliminary inventory, not the complete report required to authorize training. Run python -m src.isic after installing a working Python environment to generate outputs/isic_dataset_report.json."
+}

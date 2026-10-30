@@ -1,0 +1,421 @@
+import json
+
+import pandas as pd
+import streamlit as st
+
+from src.dataset import PROJECT_DIR, load_config
+from src.predict import DISCLAIMER, ModelNotReady, predict_bytes
+
+OUT = PROJECT_DIR / "outputs"
+CFG = load_config()
+OLD_MODEL = PROJECT_DIR / CFG["model_path"]
+NEW_MODEL = PROJECT_DIR / CFG.get("new_model_path", "models/isic_finetuned.keras")
+
+st.set_page_config(page_title="Skin Lesion Classifier", page_icon="🩺", layout="wide")
+st.markdown("<style>.block-container{max-width:1100px;padding-top:2rem}</style>", unsafe_allow_html=True)
+st.title("🩺 AI Skin Lesion Classification")
+st.caption("Experimental EfficientNetB0 research prototype for seven HAM10000 lesion categories.")
+st.warning(DISCLAIMER)
+
+# Keep the existing three-page navigation and add model selection in the sidebar.
+page = st.sidebar.radio("Page", ["Classify image", "Model evaluation", "Training history & confusion matrix"])
+
+AUG_MODEL = PROJECT_DIR / "models" / "isic_augmented_v1.keras"
+available_models = {}
+if OLD_MODEL.is_file() and AUG_MODEL.is_file():
+    available_models["Ensemble: Original + Aug v1 (Calibrated Follow-up)"] = "ensemble"
+if AUG_MODEL.is_file():
+    available_models["ISIC Augmented v1 (Calibrated Follow-up)"] = AUG_MODEL
+if NEW_MODEL.is_file():
+    available_models["ISIC fine-tuned model"] = NEW_MODEL
+if OLD_MODEL.is_file():
+    available_models["Original HAM10000 baseline"] = OLD_MODEL
+
+selected_model = None
+if available_models:
+    selected_model = available_models[st.sidebar.selectbox("Model", list(available_models))]
+
+# Validation mode selector in sidebar with honest, uninflated names
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛡️ Input Verification Gate")
+validation_mode = st.sidebar.selectbox(
+    "Input Domain Gate",
+    [
+        "Dermoscopy close-up (validated domain)",
+        "Hand photo screening (unvalidated domain)",
+        "Bypass input validation",
+    ],
+    index=0,
+    help="Model was trained and evaluated strictly on dermoscopy close-ups (HAM10000/ISIC). Non-dermoscopic camera photos represent an unvalidated domain."
+)
+
+if validation_mode.startswith("Dermoscopy"):
+    mode_code = "all_skin"
+    require_val = True
+elif validation_mode.startswith("Hand photo"):
+    mode_code = "hand_only"
+    require_val = True
+else:
+    mode_code = "bypass"
+    require_val = False
+
+
+def show_result(data):
+    try:
+        with st.spinner("Executing input verification & lesion classification..."):
+            result = predict_bytes(data, selected_model, require_hand_validation=require_val, validation_mode=mode_code)
+    except ModelNotReady as exc:
+        st.error(str(exc))
+        return
+
+    # Visual Pipeline Stepper
+    st.markdown("### 📋 Verification & Classification Pipeline")
+    step1_col, step2_col, step3_col, step4_col, step5_col = st.columns(5)
+
+    gate_verdict = result.get("gate_verdict") or {}
+    gate_status = gate_verdict.get("status")
+
+    with step1_col:
+        st.markdown("**1. Domain Gate**")
+        if not require_val:
+            st.info("⚪ Skipped")
+        elif result.get("stage_failed") == "domain_gate" or gate_status == "rejected":
+            st.error("❌ Rejected")
+        elif gate_status == "unavailable":
+            st.warning("⚠️ Unavailable")
+        else:
+            st.success("✅ Accepted")
+
+    with step2_col:
+        st.markdown("**2. Skin Pixels (Colour)**")
+        if not require_val:
+            st.info("⚪ Skipped")
+        elif result.get("stage_failed") == "domain_gate":
+            st.warning("⚪ Waiting")
+        elif result.get("stage_failed") == "skin_detection":
+            st.error("❌ No Skin Pixels")
+        elif result.get("stage_failed") == "hand_detection":
+            st.error("❌ Multi-Hand" if result.get("hand_count", 0) > 1 else "❌ No Hand")
+        elif result.get("hand_count", 0) == 1:
+            st.success("✅ Hand (Unvalidated)")
+        else:
+            st.success("✅ Skin-like Pixels")
+
+    with step3_col:
+        st.markdown("**3. Anti-Spoofing**")
+        if not require_val:
+            st.info("⚪ Skipped")
+        elif result.get("stage_failed") == "spoof_check":
+            st.error("❌ Suspected Spoof")
+        elif result.get("stage_failed") in ("file_format", "domain_gate", "skin_detection", "hand_detection"):
+            st.warning("⚪ Waiting")
+        else:
+            st.success("✅ Screened")
+
+    with step4_col:
+        st.markdown("**4. Focus & Light**")
+        if not require_val:
+            st.info("⚪ Skipped")
+        elif result.get("stage_failed") in ("skin_quality", "image_quality"):
+            st.error("❌ Quality Issue")
+        elif result.get("stage_failed"):
+            st.warning("⚪ Waiting")
+        else:
+            st.success("✅ Quality Passed")
+
+    with step5_col:
+        st.markdown("**5. Disease Classifier**")
+        if result.get("is_hand"):
+            st.warning("✋ Hand Detected")
+        elif not result.get("ok") or result.get("code") is None:
+            st.error("⛔ Blocked / Abstained")
+        else:
+            st.success("✅ Classified")
+
+    st.markdown("---")
+
+    # Reconciliation info: show user-selected mode vs actual detected input domain
+    st.caption(f"🛡️ **Selected Mode:** {validation_mode} &nbsp;|&nbsp; 🔍 **Runtime Detection:** {result.get('input_type', 'Unknown')}")
+
+    # Case A: Hand detected - Strictly NO condition label, NO score table, NO melanoma flag
+    if result.get("is_hand") or (result.get("hand_count", 0) >= 1 and result.get("code") is None):
+        hand_an = result.get("hand_analysis")
+        if hand_an is not None:
+            # Stage F Enhanced Separate UI Layout
+            st.markdown("## ✋ Hand Appearance Analysis & Modality Screening")
+            
+            # Section 1: Modality & Suitability
+            st.markdown("### 1. Input Modality & Quality Verification")
+            c_mod1, c_mod2 = st.columns(2)
+            with c_mod1:
+                st.info(f"🔍 **Detected Modality:** {result.get('input_type', 'Hand photo (unvalidated domain)')}")
+                st.write(f"**Hand Count:** {result.get('hand_count', 0)}")
+                if hand_an.get("crop_shape"):
+                    st.write(f"**Localized Hand Crop Dimensions:** {hand_an['crop_shape'][1]} × {hand_an['crop_shape'][0]} px")
+            with c_mod2:
+                qm = result.get("quality_metrics", {})
+                if qm:
+                    st.write(f"**Focus (Blur Variance):** {qm.get('blur_variance', 'N/A')}")
+                    st.write(f"**Mean Luminance:** {qm.get('luminance', 'N/A')}")
+                    st.write(f"**Contrast (Std):** {qm.get('contrast_std', 'N/A')}")
+
+            # Section 2: Normal Hand Appearance Evaluation
+            st.markdown("### 2. Normal Hand Appearance Evaluation (MobileNetV3 PCA-Mahalanobis)")
+            dec = hand_an.get("decision", "UNSUITABLE_OR_UNCERTAIN_INPUT")
+            score = hand_an.get("anomaly_score", -1.0)
+            thr = hand_an.get("threshold", 8.768)
+
+            c_met1, c_met2 = st.columns([1, 2])
+            with c_met1:
+                st.metric(
+                    "Hand Anomaly Distance",
+                    f"{score:.2f}" if score >= 0 else "N/A",
+                    delta=f"{score - thr:+.2f} vs thr" if score >= 0 else None,
+                    delta_color="inverse",
+                )
+                st.caption(f"Calibrated Threshold: **{thr:.3f}** (Validation α=0.05)")
+
+            with c_met2:
+                if dec == "USABLE_HAND_IMAGE":
+                    st.success("✅ **Consistent with Reference Normal Hand Skin Data**\n\nThe visual appearance of this hand falls within the typical distribution of our reference cohort.")
+                elif dec == "UNUSUAL_RELATIVE_TO_TRAINING_DATA":
+                    st.warning("⚠️ **Unusual Relative to Reference Normal Hand Data**\n\nThe visual appearance of this hand differs from the reference normal hand training dataset.")
+                else:
+                    st.error("🛑 **Unsuitable or Uncertain Input**\n\nCould not reliably localize or score a human hand in this image.")
+
+            # Accessory and nail polish advisory card
+            st.markdown("#### ⚠️ Confounder & Subgroup Advisory")
+            st.info(
+                "**Benchmark Evidence (Held-out Test Cohort):**\n"
+                "- **Accessories / Jewellery:** Wearing rings, wristwatches, or bracelets roughly quadrupled false anomaly alerts (**19.16%** with accessories vs. **4.35%** without).\n"
+                "- **Fingernail Polish:** Painted fingernails elevated false anomaly alerts (**22.50%** with polish vs. **8.95%** without).\n"
+                "- **Notice:** While removing accessories and photographing hands under even diffuse lighting reduces false flags, doing so does NOT guarantee a correct result."
+            )
+
+            # Section 3: Seven-Class Lesion Classifier Status (Explicitly Suppressed)
+            st.markdown("### 3. Seven-Class Lesion Classifier Status")
+            st.error(
+                "🛑 **LESION CLASSIFIER NOT APPLICABLE FOR THIS IMAGE TYPE**\n\n"
+                "The 7-class lesion classifier (melanoma, basal cell carcinoma, nevi, etc.) was trained and validated exclusively on high-magnification **dermoscopic close-ups** of pigmented lesions.\n\n"
+                "To prevent misleading, unvalidated predictions, the classifier is **intentionally suppressed** for non-dermoscopic camera photos of hands. No condition label, probability scores, or melanoma alerts are produced."
+            )
+
+            # Section 4: Mandatory Limitations Banner
+            st.markdown("### 4. Mandatory Clinical Safety Notice")
+            st.warning(
+                "🩺 **EDUCATIONAL RESEARCH PROTOTYPE — NOT A MEDICAL DEVICE:**\n"
+                "1. Appearance consistent with normal hand data **DOES NOT** certify that the skin is healthy, disease-free, or without lesion.\n"
+                "2. An unusual appearance score **DOES NOT** constitute a medical diagnosis of any condition.\n"
+                "3. Consult a qualified dermatologist or clinician for any skin concern."
+            )
+
+            if result.get("annotated_image") is not None:
+                import cv2
+                disp = cv2.cvtColor(result["annotated_image"], cv2.COLOR_BGR2RGB)
+                st.image(disp, caption="MediaPipe Hand Landmark & Region Analysis", width=420)
+
+            with st.expander("Technical Model Details"):
+                st.write(f"**Normal Hand Anomaly Model:** PCA-Regularized Mahalanobis Distance (k=48, shrinkage=0.05)")
+                st.write(f"**Backbone:** Frozen MobileNetV3Small (576-dimensional embedding, ImageNet weights)")
+                st.write(f"**Decision:** {dec}")
+                st.write(f"**Distance Score:** {score:.3f} (Threshold: {thr:.3f})")
+                st.write(f"**Domain Gate Status:** {gate_status or 'N/A'}")
+                if result.get("quality_metrics"):
+                    st.json(result["quality_metrics"])
+            return
+
+        # Fallback when feature flag is disabled: exact original Case A output
+        st.warning(f"✋ **{result.get('message', 'Hand detected. This system cannot yet tell normal skin from a skin condition.')}**")
+        st.info(
+            "💡 **Notice:** The 7-class disease classifier was trained exclusively on dermoscopic close-ups of pigmented lesions. "
+            "It was never trained on normal skin and cannot distinguish healthy hand skin from dermatological conditions."
+        )
+        if result.get("annotated_image") is not None:
+            import cv2
+            disp = cv2.cvtColor(result["annotated_image"], cv2.COLOR_BGR2RGB)
+            st.image(disp, caption="MediaPipe Hand Landmark & ROI Analysis", width=420)
+
+        with st.expander("Technical Verification Details"):
+            st.write(f"**Domain Gate Status:** {gate_status or 'N/A'}")
+            st.write(f"**Input Classification:** {result.get('input_type', 'Hand photo (unvalidated domain)')}")
+            st.write(f"**Hand Count:** {result.get('hand_count', 0)}")
+            if result.get("skin_fraction"):
+                st.write(f"**Skin Fraction:** {result['skin_fraction']:.1%}")
+            if result.get("quality_metrics"):
+                st.json(result["quality_metrics"])
+            if result.get("spoof_analysis"):
+                st.json(result["spoof_analysis"])
+        return
+
+    # Case B: Input outside validated domain (dermoscopy) or abstained on confidence
+    if not result.get("ok") or result.get("code") is None or result.get("abstained"):
+        msg = result.get("message", "No condition label shown. This photo is outside the validated domain (dermoscopy).")
+        st.error(f"### 🛑 {msg}")
+        for error in result.get("errors", []):
+            st.warning(f"**Reason:** {error}")
+        for warning in result.get("warnings", []):
+            st.info(f"💡 {warning}")
+
+        if result.get("annotated_image") is not None:
+            import cv2
+            disp = cv2.cvtColor(result["annotated_image"], cv2.COLOR_BGR2RGB)
+            st.image(disp, caption="Validation Inspection Overlay", width=420)
+
+        with st.expander("Technical Verification Details"):
+            st.write(f"**Domain Gate Status:** {gate_status or 'N/A'}")
+            st.write(f"**Input Classification:** {result.get('input_type', 'Unknown')}")
+            if result.get("stage_failed"):
+                st.write(f"**Stage Failed / Abstained:** {result.get('stage_failed')}")
+            if result.get("top_score_uncalibrated"):
+                st.write(f"**Uncalibrated Top Score:** {result['top_score_uncalibrated']:.1%} (Below 40.0% abstain threshold)")
+            if result.get("quality_metrics"):
+                st.json(result["quality_metrics"])
+            if result.get("spoof_analysis"):
+                st.json(result["spoof_analysis"])
+        return
+
+    # Case C: Genuine Dermoscopy image successfully passed all validation checks
+    if result.get("annotated_image") is not None:
+        import cv2
+        disp = cv2.cvtColor(result["annotated_image"], cv2.COLOR_BGR2RGB)
+        caption = f"Skin Tissue Overlay ({result.get('input_type', 'Skin-like pixels')})"
+        st.image(disp, caption=caption, width=420)
+
+    # Primary uncalibrated argmax category output
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Predicted Category (Argmax)", result["code"])
+    c2.metric("Argmax Score (Uncalibrated)", f"{result['score']:.1%}")
+    c3.metric("Input Domain", result.get("input_type", "Skin-like pixels (colour check only)"))
+
+    # Calibrated Melanoma Follow-Up Flag (displayed ONLY when gate accepted the image)
+    gate_accepted = (gate_status == "accepted") or (not require_val)
+    if result.get("melanoma_flag") and gate_accepted:
+        flag_info = result["melanoma_flag_info"]
+        st.warning(
+            f"⚠️ **Melanoma Follow-Up Flag**: Estimated $P(\\text{{mel}}) = {flag_info['mel_prob']:.1%}$ "
+            f"exceeds the calibrated screening threshold of **{flag_info['threshold']:.1%}**.\n\n"
+            "**Measured values:** about 60% on HAM10000 validation, 54% (95% CI 47-61%) on the test set, with about 11% of non-melanoma lesions flagged. "
+            "No flag does NOT mean no melanoma. About 46% of melanomas in testing were not flagged.\n\n"
+            "**Notice:** This is an exploratory follow-up screening flag, **NOT a medical diagnosis**. "
+            "Seek formal evaluation by a board-certified dermatologist."
+        )
+
+    st.subheader(result["name"])
+    st.write(result["explanation"])
+    st.caption("Scores are experimental deep learning outputs, are not medical probabilities, and are not a clinical diagnosis.")
+    st.table(pd.DataFrame(result["scores"], columns=["Code", "Category", "Score"]).assign(
+        Score=lambda frame: frame["Score"].map("{:.1%}".format)))
+    for warning in result["warnings"]:
+        st.warning(warning)
+
+
+if page == "Classify image":
+    tab_upload, tab_camera = st.tabs(["📁 Upload image", "📷 Camera capture"])
+    with tab_upload:
+        uploaded = st.file_uploader("JPG, JPEG or PNG (Dermoscopic lesion close-up recommended)", type=["jpg", "jpeg", "png"])
+        if uploaded is not None:
+            data = uploaded.getvalue()
+            st.image(data, caption="Preview", width=380)
+            if st.button("Analyze Lesion Image", key="a1", type="primary"):
+                show_result(data)
+    with tab_camera:
+        st.info("Your browser will ask for camera permission. Note: Standard webcams differ significantly from dermoscopy optics.")
+        shot = st.camera_input("Capture a clear close-up photo of the skin lesion")
+        if shot is not None:
+            data = shot.getvalue()
+            st.image(data, caption="Captured image", width=380)
+            if st.button("Analyze Lesion Image", key="a2", type="primary"):
+                show_result(data)
+        else:
+            st.caption("If no camera appears, check browser permissions or that no other app is using the camera.")
+
+elif page == "Model evaluation":
+    bootstrap_file = OUT / "melanoma" / "stage3_test_bootstrap_results.json"
+    three_way_file = OUT / "evaluation" / "three_model_comparison.json"
+
+    st.subheader("📊 Model Evaluation & Melanoma Sensitivity Analysis")
+    st.caption("Evaluated on the preserved, frozen HAM10000 test split (1,494 images; 187 melanomas).")
+
+    if bootstrap_file.is_file():
+        b_data = json.loads(bootstrap_file.read_text(encoding="utf-8"))
+
+        st.markdown("### 🎯 Selected Configuration: Calibrated Decision Threshold")
+        st.info(
+            "**Selection Rule:** Selected strictly on HAM10000-only validation split (1,510 images): "
+            "highest threshold $t$ achieving $\\ge 60\\%$ melanoma recall while keeping Macro F1 within $0.02$ of argmax. "
+            "Evaluated **ONCE** on the test set."
+        )
+
+        col_sel1, col_sel2 = st.columns(2)
+        with col_sel1:
+            st.markdown("#### ⭐ Selected: Ensemble (Orig + Aug v1) with $t=0.347$")
+            ens_m = b_data.get("ensemble_calibrated", {})
+            st.metric("Test Mel Recall", f"{ens_m.get('recall', 0):.1%}",
+                      help=f"95% CI: [{ens_m.get('recall_ci95', [0,0])[0]:.1%} - {ens_m.get('recall_ci95', [0,0])[1]:.1%}]")
+            st.metric("Test Mel Precision", f"{ens_m.get('precision', 0):.1%}",
+                      help=f"95% CI: [{ens_m.get('precision_ci95', [0,0])[0]:.1%} - {ens_m.get('precision_ci95', [0,0])[1]:.1%}]")
+            st.metric("False Alarms (FP count)", f"{ens_m.get('false_alarms', 0)} / 1,307",
+                      help=f"95% CI: [{ens_m.get('false_alarms_ci95', [0,0])[0]} - {ens_m.get('false_alarms_ci95', [0,0])[1]}]")
+            st.metric("Test Macro F1", f"{ens_m.get('macro_f1', 0):.3f}")
+            st.metric("Test Accuracy", f"{ens_m.get('accuracy', 0):.1%}")
+
+        with col_sel2:
+            st.markdown("#### 🔬 Alternative: Aug v1 with $t=0.233$")
+            aug_m = b_data.get("aug_v1_calibrated", {})
+            st.metric("Test Mel Recall", f"{aug_m.get('recall', 0):.1%}",
+                      help=f"95% CI: [{aug_m.get('recall_ci95', [0,0])[0]:.1%} - {aug_m.get('recall_ci95', [0,0])[1]:.1%}]")
+            st.metric("Test Mel Precision", f"{aug_m.get('precision', 0):.1%}",
+                      help=f"95% CI: [{aug_m.get('precision_ci95', [0,0])[0]:.1%} - {aug_m.get('precision_ci95', [0,0])[1]:.1%}]")
+            st.metric("False Alarms (FP count)", f"{aug_m.get('false_alarms', 0)} / 1,307",
+                      help=f"95% CI: [{aug_m.get('false_alarms_ci95', [0,0])[0]} - {aug_m.get('false_alarms_ci95', [0,0])[1]}]")
+            st.metric("Test Macro F1", f"{aug_m.get('macro_f1', 0):.3f}")
+            st.metric("Test Accuracy", f"{aug_m.get('accuracy', 0):.1%}")
+
+        st.markdown("---")
+        st.markdown("### 📋 Measured Test Set Results & Uncertainty (95% Bootstrap Intervals)")
+        st.caption("Note: All rows below are reported for sensitivity analysis and honest comparison against selection.")
+
+        comp_table = []
+        labels_map = {
+            "original_argmax": "Original Baseline (Argmax)",
+            "aug_v1_argmax": "ISIC Aug v1 (Argmax)",
+            "aug_v1_calibrated": "ISIC Aug v1 (Calibrated t=0.233)",
+            "ensemble_argmax": "Ensemble: Orig + Aug v1 (Argmax)",
+            "ensemble_calibrated": "Ensemble: Orig + Aug v1 (Calibrated t=0.347)",
+        }
+        for k, row in b_data.items():
+            comp_table.append({
+                "Configuration": labels_map.get(k, k),
+                "Role": "SELECTED" if k == "ensemble_calibrated" else "Sensitivity analysis",
+                "Mel Recall (95% CI)": f"{row['recall']:.1%} [{row['recall_ci95'][0]:.1%} - {row['recall_ci95'][1]:.1%}]",
+                "Mel Precision (95% CI)": f"{row['precision']:.1%} [{row['precision_ci95'][0]:.1%} - {row['precision_ci95'][1]:.1%}]",
+                "False Alarms (95% CI)": f"{row['false_alarms']} [{row['false_alarms_ci95'][0]} - {row['false_alarms_ci95'][1]}]",
+                "Macro F1 (95% CI)": f"{row['macro_f1']:.3f} [{row['macro_f1_ci95'][0]:.3f} - {row['macro_f1_ci95'][1]:.3f}]",
+                "Accuracy (95% CI)": f"{row['accuracy']:.1%} [{row['accuracy_ci95'][0]:.1%} - {row['accuracy_ci95'][1]:.1%}]",
+                "ROC-AUC (95% CI)": f"{row['roc_auc']:.4f} [{row['roc_auc_ci95'][0]:.4f} - {row['roc_auc_ci95'][1]:.4f}]",
+                "PR-AUC (95% CI)": f"{row['pr_auc']:.4f} [{row['pr_auc_ci95'][0]:.4f} - {row['pr_auc_ci95'][1]:.4f}]",
+            })
+        st.dataframe(pd.DataFrame(comp_table), use_container_width=True)
+
+    elif three_way_file.is_file():
+        rep = json.loads(three_way_file.read_text(encoding="utf-8"))
+        st.dataframe(pd.DataFrame(rep.get("models", {})).T)
+
+else:
+    shown = False
+    for name, caption in (("history_accuracy.png", "Accuracy"), ("history_loss.png", "Loss"),
+                          ("confusion_matrix.png", "Confusion matrix"),
+                          ("confusion_matrix_normalized.png", "Normalized confusion matrix")):
+        image_file = OUT / name
+        if image_file.is_file():
+            st.image(str(image_file), caption=caption, width=560)
+            shown = True
+    for name, caption in (("isic_augmented_v1_confusion_matrix.png", "ISIC Augmented v1 confusion matrix"),
+                          ("isic_finetuned_confusion_matrix.png", "ISIC fine-tuned confusion matrix"),
+                          ("original_confusion_matrix.png", "Original model confusion matrix")):
+        image_file = OUT / "evaluation" / name
+        if image_file.is_file():
+            st.image(str(image_file), caption=caption, width=560)
+            shown = True
+    if not shown:
+        st.info("No graphs yet. Run training and evaluation first.")

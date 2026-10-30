@@ -1,0 +1,83 @@
+{
+  "weights": {
+    "0": 0.7423153509203022,
+    "1": 0.4071562441463293,
+    "2": 0.44825524739394645,
+    "3": 2.328724395050433,
+    "4": 0.38686819044360377,
+    "5": 0.3702146202692412,
+    "6": 2.316465951776144
+  },
+  "details": [
+    {
+      "class_name": "akiec",
+      "class_index": 0,
+      "train_count": 690,
+      "train_fraction": 0.041702,
+      "effective_num_samples": 498.5971,
+      "raw_weight": 0.00200563,
+      "normalized_weight": 0.742315,
+      "ratio_vs_nv": 2.0051
+    },
+    {
+      "class_name": "bcc",
+      "class_index": 1,
+      "train_count": 2396,
+      "train_fraction": 0.144808,
+      "effective_num_samples": 909.0276,
+      "raw_weight": 0.00110008,
+      "normalized_weight": 0.407156,
+      "ratio_vs_nv": 1.0998
+    },
+    {
+      "class_name": "bkl",
+      "class_index": 2,
+      "train_count": 1746,
+      "train_fraction": 0.105524,
+      "effective_num_samples": 825.6819,
+      "raw_weight": 0.00121112,
+      "normalized_weight": 0.448255,
+      "ratio_vs_nv": 1.2108
+    },
+    {
+      "class_name": "df",
+      "class_index": 3,
+      "train_count": 173,
+      "train_fraction": 0.010456,
+      "effective_num_samples": 158.9352,
+      "raw_weight": 0.00629187,
+      "normalized_weight": 2.328724,
+      "ratio_vs_nv": 6.2902
+    },
+    {
+      "class_name": "mel",
+      "class_index": 4,
+      "train_count": 3138,
+      "train_fraction": 0.189653,
+      "effective_num_samples": 956.6986,
+      "raw_weight": 0.00104526,
+      "normalized_weight": 0.386868,
+      "ratio_vs_nv": 1.045
+    },
+    {
+      "class_name": "nv",
+      "class_index": 5,
+      "train_count": 8229,
+      "train_fraction": 0.497341,
+      "effective_num_samples": 999.7343,
+      "raw_weight": 0.00100027,
+      "normalized_weight": 0.370215,
+      "ratio_vs_nv": 1.0
+    },
+    {
+      "class_name": "vasc",
+      "class_index": 6,
+      "train_count": 174,
+      "train_fraction": 0.010516,
+      "effective_num_samples": 159.7763,
+      "raw_weight": 0.00625875,
+      "normalized_weight": 2.316466,
+      "ratio_vs_nv": 6.2571
+    }
+  ]
+}
